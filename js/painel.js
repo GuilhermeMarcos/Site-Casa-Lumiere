@@ -95,11 +95,10 @@
     }
     return '';
   }
-  function linkWhats(tel, msg){
+  function linkWhats(tel, msg, web){
     var n = String(tel || '').replace(/\D/g, ''); if(!n) return '';
     if(n.length <= 11) n = '55' + n;
-    var comp = window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine)').matches;
-    return (comp ? 'https://web.whatsapp.com/send?phone=' : 'https://wa.me/') + n + (comp ? '&text=' : '?text=') + encodeURIComponent(msg || '');
+    return (web ? 'https://web.whatsapp.com/send?phone=' : 'https://wa.me/') + n + (web ? '&text=' : '?text=') + encodeURIComponent(msg || '');
   }
 
   /* ===== Escrita ===== */
@@ -198,7 +197,12 @@
       var q = el('div', 'quando'); if(!agrupar) q.appendChild(el('strong', null, diaCurto(r.data))); q.appendChild(el('span', null, faixa(r.horas))); li.appendChild(q);
       var meio = el('div'); meio.appendChild(el('div', 'sala-nome', nomeSala(r.sala)));
       var p = el('div', 'pessoa'); p.appendChild(d.createTextNode((r.nome || 'Sem nome') + (r.especialidade ? ', ' + r.especialidade : '') + (r.telefone ? ' · ' : '')));
-      if(r.telefone){ var a = el('a', null, r.telefone); a.href = linkWhats(r.telefone, 'Olá, ' + (r.nome || '').split(' ')[0] + '! Aqui é da Casa Lumière, sobre a sua reserva da ' + nomeSala(r.sala) + ' em ' + diaLongo(r.data).toLowerCase() + ', ' + faixa(r.horas) + '.'); a.target = '_blank'; a.rel = 'noopener'; p.appendChild(a); }
+      if(r.telefone){
+        var texto = 'Olá, ' + (r.nome || '').split(' ')[0] + '! Aqui é da Casa Lumière, sobre a sua reserva da ' + nomeSala(r.sala) + ' em ' + diaLongo(r.data).toLowerCase() + ', ' + faixa(r.horas) + '.';
+        var a = el('a', null, r.telefone); a.href = linkWhats(r.telefone, texto); a.target = '_blank'; a.rel = 'noopener'; a.title = 'Abrir no WhatsApp'; p.appendChild(a);
+        p.appendChild(d.createTextNode(' '));
+        var w = el('a', 'link-web', 'WhatsApp Web'); w.href = linkWhats(r.telefone, texto, true); w.target = '_blank'; w.rel = 'noopener'; p.appendChild(w);
+      }
       meio.appendChild(p);
       var chip = el('span', 'chip ' + ({confirmada:'ok', pre:'pre', expirada:'exp'})[r.status], ({confirmada:'Reservada', pre:'Pré-reserva', expirada:'Pré-reserva expirou'})[r.status]); meio.appendChild(chip);
       if(r.status === 'pre' && r.expiraEm){ meio.appendChild(el('span', 'expira', 'Vale até ' + fmtHora.format(new Date(r.expiraEm)))); }
