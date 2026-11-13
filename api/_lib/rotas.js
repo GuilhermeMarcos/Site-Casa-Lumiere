@@ -75,7 +75,7 @@ async function agenda(req) {
   );
   return [200, {
     agora,
-    geral: { abre: geral.abre, fecha: geral.fecha, diasAFrente: geral.diasAFrente, diasAbertos: geral.diasAbertos, whatsappAgatha: geral.whatsappAgatha, botaoTeste: !!geral.botaoTeste },
+    geral: { abre: geral.abre, fecha: geral.fecha, diasAFrente: geral.diasAFrente, diasAbertos: geral.diasAbertos, whatsappAgatha: geral.whatsappAgatha },
     salas: salas.map(semValor),
     fixos,
     ocupados,
@@ -351,7 +351,7 @@ async function salvarConfig(req, _p, c) {
   let w = soDigitos(c.whatsappAgatha);
   if (w && w.length < 10) throw new Falha(400, 'whatsapp', 'Digite o WhatsApp com DDD.');
   if (w && w.length <= 11) w = '55' + w;
-  const valor = { abre, fecha, diasAFrente, diasAbertos, whatsappAgatha: w, botaoTeste: !!c.botaoTeste };
+  const valor = { abre, fecha, diasAFrente, diasAbertos, whatsappAgatha: w };
   await q("INSERT INTO config (chave, valor) VALUES ('geral', $1) ON CONFLICT (chave) DO UPDATE SET valor = EXCLUDED.valor", [JSON.stringify(valor)]);
   return [200, { geral: valor }];
 }

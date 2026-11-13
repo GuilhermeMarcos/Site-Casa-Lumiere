@@ -7,7 +7,7 @@
   var CONFIG = {
     whatsapp: '',
     assinatura: '',
-    email: 'contato@casalumiere.com.br'
+    email: 'acasalumiere@gmail.com'
   };
 
   var d = document, html = d.documentElement;

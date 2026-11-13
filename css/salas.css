@@ -113,9 +113,6 @@
 .pre-caixa .btn{width:100%;text-decoration:none}
 .pre-caixa .btn svg{width:1.2em;height:1.2em;fill:currentColor}
 .pre-caixa .depois{margin-top:1rem;background:none;border:0;color:var(--on-walnut-muted);font:500 .875rem var(--body);text-decoration:underline;text-underline-offset:.2em;cursor:pointer}
-.btn-teste{display:flex;align-items:center;justify-content:center;gap:.5em;width:100%;padding:.8em 1em;border-radius:999px;border:1px dashed rgba(246,220,152,.6);color:var(--gold-1);font:600 .8125rem/1.2 var(--body);text-decoration:none;text-align:center}
-.btn-teste:hover{background:rgba(246,220,152,.08)}
-.btn-teste svg{width:1.1em;height:1.1em;fill:currentColor}
 .pre-caixa .num-agatha{margin-top:.8rem;font-size:.8125rem;color:var(--on-walnut-muted)}
 .legenda{display:flex;flex-wrap:wrap;gap:.5rem 1.25rem;margin-top:1rem;font-size:.8125rem;color:var(--muted)}
 .legenda span{display:inline-flex;align-items:center;gap:.45rem}

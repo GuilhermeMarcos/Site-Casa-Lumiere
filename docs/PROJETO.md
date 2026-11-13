@@ -58,15 +58,15 @@ Regras extras do MVP: cada conta pode ter até 3 pré-reservas esperando confirm
 - [x] Primeiro acesso da equipe com código
 - [x] A equipe cria uma senha nova para o cliente que esqueceu (pelo painel)
 - [x] A equipe troca a própria senha com o código da equipe
-- [x] Botão de teste da mensagem liga e desliga pelo painel
 - [x] Testes automáticos da API (`npm test`)
 
 ### Sprint 2
 
-- [ ] Ligar banco, fotos e variáveis na Vercel e testar no endereço de prévia
+- [x] Ligar banco, fotos e variáveis na Vercel e publicar
 - [ ] Fotos reais das salas (aguardando a Casa)
 - [ ] Confirmar com a Casa a regra de cancelamento
-- [ ] Desligar o botão de teste depois dos testes
+- [x] Tirar o botão de teste da mensagem para a Agatha
+- [x] E-mail da Casa no site inteiro: acasalumiere@gmail.com
 - [ ] Recuperação de senha por e-mail
 - [ ] Lista de clientes no painel
 
