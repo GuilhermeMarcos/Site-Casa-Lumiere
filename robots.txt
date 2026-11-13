@@ -1,4 +1,6 @@
 User-agent: *
 Allow: /
+Disallow: /painel.html
+Disallow: /api/
 
 Sitemap: https://casalumiere.com.br/sitemap.xml

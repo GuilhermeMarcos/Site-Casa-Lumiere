@@ -1,0 +1,20 @@
+{
+  "name": "site-casa-lumiere",
+  "private": true,
+  "description": "Site da Casa Lumière com agendamento de salas, conta e painel da equipe.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "node dev/servidor.mjs",
+    "test": "node --test dev/testes.mjs"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^1.0.0",
+    "@vercel/blob": "^2.0.0"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.3.0"
+  }
+}
