@@ -76,7 +76,6 @@ export const GERAL_PADRAO = {
   diasAFrente: 100,
   diasAbertos: [0, 1, 2, 3, 4, 5, 6],
   whatsappAgatha: '5519992487347',
-  botaoTeste: true,
 };
 
 const SALAS = [

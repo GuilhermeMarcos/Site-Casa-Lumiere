@@ -427,7 +427,7 @@
 
   /* Funcionamento */
   function telaFuncionamento(s){
-    var g = st.geral || {abre:7, fecha:20, diasAFrente:100, diasAbertos:[0,1,2,3,4,5,6], whatsappAgatha:'', botaoTeste:false};
+    var g = st.geral || {abre:7, fecha:20, diasAFrente:100, diasAbertos:[0,1,2,3,4,5,6], whatsappAgatha:''};
     var b = bloco('Horário e regras', '');
     var f = el('form'); f.noValidate = true; var cs = el('div', 'campos');
     var horasDia = []; for(var h = 5; h <= 23; h++) horasDia.push([h, pad(h) + 'h']);
@@ -440,8 +440,6 @@
     var ds = el('div', 'dias-sem');
     DIAS_SEM.forEach(function(n, i){ var l = el('label'); var c = el('input'); c.type = 'checkbox'; c.value = i; c.checked = (g.diasAbertos || []).indexOf(i) >= 0; l.appendChild(c); l.appendChild(el('span', null, n)); ds.appendChild(l); });
     cd.appendChild(ds); cs.appendChild(cd);
-    var ct = el('div', 'campo largo'); var lt = el('label', 'linha-check'); var bt0 = el('input'); bt0.type = 'checkbox'; bt0.id = 'g-teste'; bt0.checked = !!g.botaoTeste;
-    lt.appendChild(bt0); lt.appendChild(el('span', null, 'Mostrar o botão "Testar mensagem para a Agatha" na página de salas')); ct.appendChild(lt); cs.appendChild(ct);
     f.appendChild(cs);
     var rod = el('div', 'rodape-form'); var msg = el('p', 'msg'); rod.appendChild(msg); var salvo = el('span', 'salvo'); salvo.setAttribute('role', 'status'); rod.appendChild(salvo);
     var bt = el('button', 'btn', 'Salvar'); bt.type = 'submit'; rod.appendChild(bt); f.appendChild(rod);
@@ -454,7 +452,7 @@
       var dias = Array.prototype.map.call(ds.querySelectorAll('input:checked'), function(c){ return +c.value; });
       if(!dias.length){ msg.textContent = 'Deixe pelo menos um dia aberto.'; return; }
       bt.disabled = true;
-      escrever('config', function(){ return api('PUT', '/api/admin/config', {abre: abre, fecha: fecha, diasAFrente: +$('g-dias').value, diasAbertos: dias, whatsappAgatha: n, botaoTeste: $('g-teste').checked}); }).then(function(ok){ bt.disabled = false; if(ok) toast('Funcionamento salvo. O site já mostra as mudanças.'); });
+      escrever('config', function(){ return api('PUT', '/api/admin/config', {abre: abre, fecha: fecha, diasAFrente: +$('g-dias').value, diasAbertos: dias, whatsappAgatha: n}); }).then(function(ok){ bt.disabled = false; if(ok) toast('Funcionamento salvo. O site já mostra as mudanças.'); });
     });
     b.appendChild(f); s.appendChild(b);
     s.appendChild(blocoSenha());

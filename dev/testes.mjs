@@ -225,12 +225,12 @@ test('equipe altera salas, fotos, horários fixos e funcionamento', async () => 
   assert.equal(r.status, 201);
   r = await ana('POST', '/api/reservas', { sala: 'safira', data: dia, horas: [10] });
   assert.ok(r.status === 409);
-  r = await equipe('PUT', '/api/admin/config', { abre: 8, fecha: 21, diasAFrente: 60, diasAbertos: [1, 2, 3, 4, 5, 6], whatsappAgatha: '(19) 99248-7347', botaoTeste: false });
+  r = await equipe('PUT', '/api/admin/config', { abre: 8, fecha: 21, diasAFrente: 60, diasAbertos: [1, 2, 3, 4, 5, 6], whatsappAgatha: '(19) 99248-7347' });
   assert.equal(r.status, 200);
   assert.equal(r.dados.geral.whatsappAgatha, '5519992487347');
   r = await anonimo('GET', '/api/agenda');
   assert.equal(r.dados.geral.abre, 8);
-  assert.equal(r.dados.geral.botaoTeste, false);
+  assert.equal(r.dados.geral.botaoTeste, undefined, 'o botão de teste saiu');
   r = await equipe('POST', '/api/admin/salas');
   assert.equal(r.status, 201);
 });

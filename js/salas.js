@@ -1,7 +1,7 @@
 /* Agendamento de salas da Casa Lumière: agenda, pré-reserva e minhas reservas, ligado à API */
 (function(){
   /* Tudo o que a equipe altera no painel (salas, horários fixos, funcionamento) vem de /api/agenda */
-  var CONFIG = { salas: [], fixos: [], abre: 7, fecha: 20, diasAFrente: 100, diasAbertos: [0,1,2,3,4,5,6], whatsappAgatha: '5519992487347', botaoTeste: false };
+  var CONFIG = { salas: [], fixos: [], abre: 7, fecha: 20, diasAFrente: 100, diasAbertos: [0,1,2,3,4,5,6], whatsappAgatha: '5519992487347' };
   var MONO = 'assets/img/monograma.webp';
   var EXPIRA_TXT = '1h30';
 
@@ -66,7 +66,7 @@
     carregando = api('GET', '/api/agenda').then(function(r){
       CONFIG.salas = r.salas.map(function(s){ return { id: s.id, nome: s.nome, tipo: s.tipo, descricao: s.descricao, foto: s.foto, indisponivel: !s.disponivel }; });
       CONFIG.fixos = r.fixos;
-      ['abre', 'fecha', 'diasAFrente', 'diasAbertos', 'whatsappAgatha', 'botaoTeste'].forEach(function(k){ if(r.geral[k] !== undefined) CONFIG[k] = r.geral[k]; });
+      ['abre', 'fecha', 'diasAFrente', 'diasAbertos', 'whatsappAgatha'].forEach(function(k){ if(r.geral[k] !== undefined) CONFIG[k] = r.geral[k]; });
       var mapa = {}; r.ocupados.forEach(function(o){ mapa[o.sala + '_' + o.data + '_' + o.hora] = o; });
       st.ocupados = mapa;
       montarDias(r.agora.data);
@@ -255,7 +255,6 @@
     if(!enviando) btn.textContent = st.conta ? 'Pré-reservar' : 'Entrar para pré-reservar';
     btn.disabled = enviando || !st.sel.length;
     desenharDica();
-    atualizarTeste();
   }
   function desenharAgenda(){
     $('agenda-titulo').textContent = cap(diaLongo(st.data));
@@ -398,17 +397,6 @@
     f.addEventListener('click', function(e){ if(e.target === f) fechar(); });
     d.addEventListener('keydown', esc);
     d.body.appendChild(f); btn.focus();
-  }
-
-  /* Botão temporário de teste: monta a mensagem com o que está escolhido, sem pré-reservar.
-     Some quando a equipe desliga "Botão de teste" no painel. */
-  function atualizarTeste(){
-    var b = $('btn-teste'); if(!b) return;
-    b.hidden = !CONFIG.botaoTeste || !CONFIG.salas.length; if(b.hidden) return;
-    if(!b.firstChild || b.firstChild.nodeName !== 'svg'){ b.innerHTML = ICONE_WA + 'Testar mensagem para a Agatha'; }
-    var horas = st.sel.length ? st.sel.slice().sort(function(a,c){ return a - c; }) : [9, 10];
-    var c = st.conta || {};
-    b.href = linkAgatha('[TESTE] ' + msgAgatha(CONFIG.salas[st.sala].id, st.data, horas, c.nome || 'Teste do site', c.especialidade || '', c.telefone || '(sem número)'));
   }
 
   /* ===== Conta ===== */
