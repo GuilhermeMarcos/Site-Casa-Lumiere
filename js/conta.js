@@ -144,11 +144,11 @@
     $('r-email').value = $('e-email').value;
     var msg = 'Olá! Esqueci a senha da minha conta no site da Casa Lumière. Meu e-mail: ' + ($('e-email').value.trim() || '');
     $('esq-wa').href = linkWhats(WA_CASA, msg);
+    $('esq-wa-web').href = linkWhats(WA_CASA, msg, true);
     $('esq-wa').focus();
   });
-  function linkWhats(num, msg){
-    var comp = window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine)').matches;
-    return comp ? 'https://web.whatsapp.com/send?phone=' + num + '&text=' + encodeURIComponent(msg) : 'https://wa.me/' + num + '?text=' + encodeURIComponent(msg);
+  function linkWhats(num, msg, web){
+    return web ? 'https://web.whatsapp.com/send?phone=' + num + '&text=' + encodeURIComponent(msg) : 'https://wa.me/' + num + '?text=' + encodeURIComponent(msg);
   }
 
   /* ===== Mensagens dos formulários ===== */

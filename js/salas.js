@@ -366,22 +366,25 @@
     linhas.push('WhatsApp: ' + tel, '', 'Pode confirmar a reserva e me dizer como faço o pagamento?');
     return linhas.join('\n');
   }
-  /* No computador abre o WhatsApp Web; no celular abre o aplicativo */
-  var noComputador = window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine)').matches;
-  function linkAgatha(msg){
-    return noComputador
+  /* Duas opções sempre: o WhatsApp normal (aplicativo) e o WhatsApp Web */
+  function linkAgatha(msg, web){
+    return web
       ? 'https://web.whatsapp.com/send?phone=' + CONFIG.whatsappAgatha + '&text=' + encodeURIComponent(msg)
       : 'https://wa.me/' + CONFIG.whatsappAgatha + '?text=' + encodeURIComponent(msg);
   }
   function telVisivel(n){ n = String(n || '').replace(/\D/g, ''); if(n.indexOf('55') === 0 && n.length > 11) n = n.slice(2); return n.length === 11 ? '(' + n.slice(0,2) + ') ' + n.slice(2,7) + '-' + n.slice(7) : n; }
   function botaoWhats(msg, rotulo){
+    var par = d.createElement('span'); par.className = 'par-wa';
     var a = d.createElement('a'); a.className = 'btn-wa'; a.href = linkAgatha(msg); a.target = '_blank'; a.rel = 'noopener';
-    a.innerHTML = ICONE_WA; a.appendChild(d.createTextNode(rotulo)); return a;
+    a.innerHTML = ICONE_WA; a.appendChild(d.createTextNode(rotulo));
+    var w = d.createElement('a'); w.className = 'btn-wa web'; w.href = linkAgatha(msg, true); w.target = '_blank'; w.rel = 'noopener';
+    w.textContent = 'WhatsApp Web'; w.setAttribute('aria-label', rotulo + ' pelo WhatsApp Web');
+    par.appendChild(a); par.appendChild(w); return par;
   }
   function janelaPre(r){
     var antes = d.activeElement;
     var f = d.createElement('div'); f.className = 'pre-fundo';
-    f.innerHTML = '<div class="pre-caixa" role="dialog" aria-modal="true" aria-labelledby="pre-titulo"><img class="mono-pre" alt=""><h2 id="pre-titulo">Horário <em>pré-reservado</em></h2><p class="pre-txt"></p><dl></dl><a class="btn btn-grande" target="_blank" rel="noopener"></a><p class="num-agatha"></p><button type="button" class="depois">Enviar depois</button></div>';
+    f.innerHTML = '<div class="pre-caixa" role="dialog" aria-modal="true" aria-labelledby="pre-titulo"><img class="mono-pre" alt=""><h2 id="pre-titulo">Horário <em>pré-reservado</em></h2><p class="pre-txt"></p><dl></dl><p class="enviar-por">Enviar para a Agatha pelo</p><div class="duas-wa"><a class="btn btn-grande wa-app" target="_blank" rel="noopener"></a><a class="btn btn-grande wa-web" target="_blank" rel="noopener">WhatsApp Web</a></div><p class="num-agatha"></p><button type="button" class="depois">Enviar depois</button></div>';
     f.querySelector('.mono-pre').src = MONO;
     f.querySelector('.pre-txt').textContent = 'Para garantir, envie os detalhes para a Agatha. Ela combina o pagamento com você e confirma a reserva. Sem confirmação, o horário volta a ficar livre em ' + EXPIRA_TXT + '.';
     f.querySelector('.num-agatha').textContent = 'Agatha: ' + telVisivel(CONFIG.whatsappAgatha);
@@ -389,10 +392,13 @@
     [['Sala', nomeSalaId(r.sala)], ['Dia', diaLongo(r.data)], ['Horário', faixa(r.horas)], ['Total', r.horas.length + (r.horas.length === 1 ? ' hora' : ' horas')]].forEach(function(l){
       var div = d.createElement('div'), dt = d.createElement('dt'), dd = d.createElement('dd'); dt.textContent = l[0]; dd.textContent = l[1]; div.appendChild(dt); div.appendChild(dd); dl.appendChild(div);
     });
-    var btn = f.querySelector('.btn'); btn.href = linkAgatha(msgAgatha(r.sala, r.data, r.horas, r.nome, r.especialidade, r.telefone)); btn.innerHTML = ICONE_WA + 'Enviar para a Agatha';
+    var texto = msgAgatha(r.sala, r.data, r.horas, r.nome, r.especialidade, r.telefone);
+    var btn = f.querySelector('.wa-app'), web = f.querySelector('.wa-web');
+    btn.href = linkAgatha(texto); btn.innerHTML = ICONE_WA + 'WhatsApp';
+    web.href = linkAgatha(texto, true);
     function fechar(){ f.remove(); d.removeEventListener('keydown', esc); if(antes && antes.focus) antes.focus(); }
     function esc(e){ if(e.key === 'Escape') fechar(); }
-    btn.addEventListener('click', function(){ setTimeout(fechar, 300); });
+    [btn, web].forEach(function(b){ b.addEventListener('click', function(){ setTimeout(fechar, 300); }); });
     f.querySelector('.depois').addEventListener('click', fechar);
     f.addEventListener('click', function(e){ if(e.target === f) fechar(); });
     d.addEventListener('keydown', esc);
