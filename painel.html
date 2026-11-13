@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Painel | Casa Lumière</title>
+<meta name="description" content="Área da equipe da Casa Lumière.">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#2E1F16">
+<link rel="icon" href="assets/img/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Montserrat:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="css/painel.css">
+<script src="js/painel.js" defer></script>
+</head>
+<body>
+<div class="app">
+  <aside class="lateral">
+    <a class="marca-link" href="index.html" aria-label="Ir para o site"><img class="marca" src="assets/img/casa-lumiere-logo.webp" width="697" height="215" alt="Casa Lumière"></a>
+    <nav class="menu" role="tablist" aria-label="Seções do painel" id="menu"></nav>
+    <div class="quem"><span class="av" id="q-av" aria-hidden="true"></span><div><strong id="q-nome">Casa Lumière</strong><span>Equipe</span></div><button class="sair-painel" id="sair" type="button" hidden>Sair</button></div>
+  </aside>
+  <main class="conteudo">
+    <div class="cab">
+      <div><h1 id="titulo">Painel da <em>Casa</em></h1><p id="sub"></p></div>
+      <p class="estado" id="estado" role="status"></p>
+    </div>
+    <div id="area"></div>
+  </main>
+</div>
+<div id="camada"></div>
+</body>
+</html>

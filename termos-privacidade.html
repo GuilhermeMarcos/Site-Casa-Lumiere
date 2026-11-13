@@ -29,6 +29,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Montserrat:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/conta.css">
 <script>(function(){var d=document.documentElement;d.classList.add('js');try{if(!sessionStorage.getItem('cl-visitou')){d.classList.add('primeira')}sessionStorage.setItem('cl-visitou','1')}catch(e){}})();</script>
 <script src="js/main.js" defer></script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Início", "item": "https://casalumiere.com.br/"}, {"@type": "ListItem", "position": 2, "name": "Termos e Privacidade", "item": "https://casalumiere.com.br/termos-privacidade.html"}]}</script>
@@ -46,7 +47,8 @@
     <nav class="nav nav-esq" aria-label="Principal"><a class="nav-link" href="index.html">Início</a><a class="nav-link" href="profissionais.html">Profissionais</a><a class="nav-link" href="faca-parte.html">Faça Parte</a></nav>
     <a class="marca" href="index.html" data-rotulo="Início"><img src="assets/img/casa-lumiere-logo.webp" width="697" height="215" alt="Casa Lumière: estética, saúde e business"></a>
     <div class="nav-dir">
-      <nav class="nav" aria-label="Principal, continuação"><a class="nav-link" href="assinatura.html">Assinatura</a><a class="nav-link" href="contato.html">Contato</a></nav>
+      <nav class="nav" aria-label="Principal, continuação"><a class="nav-link" href="salas.html">Salas</a><a class="nav-link" href="assinatura.html">Assinatura</a><a class="nav-link" href="contato.html">Contato</a></nav>
+      <button class="conta-topo" id="conta-topo" type="button" aria-expanded="false"></button>
       <a class="btn btn-topo" href="contato.html" data-wa="Olá! Vim pelo site da Casa Lumière e gostaria de agendar um atendimento."><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5C6.5 2.5 2.2 6.4 2.2 11.2c0 2.6 1.2 4.9 3.2 6.5L4.5 21.5l4.4-2.2c1 .3 2 .4 3.1.4 5.5 0 9.8-3.9 9.8-8.6S17.5 2.5 12 2.5zm-4 10.1a1.3 1.3 0 1 1 0-2.6 1.3 1.3 0 0 1 0 2.6zm4 0a1.3 1.3 0 1 1 0-2.6 1.3 1.3 0 0 1 0 2.6zm4 0a1.3 1.3 0 1 1 0-2.6 1.3 1.3 0 0 1 0 2.6z"/></svg>Agendar</a>
     </div>
     <button class="menu-btn" id="menu-btn" type="button" aria-expanded="false" aria-controls="menu-movel"><span class="rotulo">Menu</span><span class="anel"><i></i></span></button>
@@ -54,9 +56,10 @@
 </header>
 <div class="menu-movel" id="menu-movel" role="dialog" aria-modal="true" aria-label="Menu" hidden>
   <div class="mm-topo"><img src="assets/img/monograma.webp" width="560" height="520" alt=""><button class="mm-fechar" id="menu-fechar" type="button" aria-label="Fechar menu">×</button></div>
-  <nav class="mm-links" aria-label="Menu do celular"><a href="index.html" style="--i:0">Início</a><a href="profissionais.html" style="--i:1">Profissionais</a><a href="faca-parte.html" style="--i:2">Faça Parte</a><a href="assinatura.html" style="--i:3">Assinatura</a><a href="contato.html" style="--i:4">Contato</a></nav>
+  <nav class="mm-links" aria-label="Menu do celular"><a href="index.html" style="--i:0">Início</a><a href="profissionais.html" style="--i:1">Profissionais</a><a href="faca-parte.html" style="--i:2">Faça Parte</a><a href="salas.html" style="--i:3">Salas</a><a href="assinatura.html" style="--i:4">Assinatura</a><a href="contato.html" style="--i:5">Contato</a></nav>
   <div class="mm-pe">
     <a class="btn btn-grande" href="contato.html" data-wa="Olá! Vim pelo site da Casa Lumière e gostaria de agendar um atendimento."><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5C6.5 2.5 2.2 6.4 2.2 11.2c0 2.6 1.2 4.9 3.2 6.5L4.5 21.5l4.4-2.2c1 .3 2 .4 3.1.4 5.5 0 9.8-3.9 9.8-8.6S17.5 2.5 12 2.5zm-4 10.1a1.3 1.3 0 1 1 0-2.6 1.3 1.3 0 0 1 0 2.6zm4 0a1.3 1.3 0 1 1 0-2.6 1.3 1.3 0 0 1 0 2.6zm4 0a1.3 1.3 0 1 1 0-2.6 1.3 1.3 0 0 1 0 2.6z"/></svg>Agende pelo WhatsApp</a>
+    <button class="mm-conta" id="conta-mm" type="button">Entrar ou criar conta</button>
     <span>R. Rota dos Imigrantes, 425, Piso superior, Sala 115, Holambra, SP</span>
     <a href="https://www.instagram.com/casalumierebr/" target="_blank" rel="noopener">@casalumierebr</a>
   </div>
@@ -74,7 +77,7 @@
   <div class="wrap grade">
     <img class="mono" src="assets/img/monograma.webp" width="560" height="520" alt="" loading="lazy">
     <div class="stack" style="gap:.5rem">
-      <h2>Casa Lumière · Holambra-SP</h2>
+      <h2>Casa Lumière&nbsp;· Holambra-SP</h2>
       <p class="quieto">Saúde, estética e Business em um só endereço.</p>
     </div>
     <ul>
@@ -92,5 +95,75 @@
     <button class="btn" id="cookies-ok" type="button">Aceitar</button>
   </div>
 </aside>
+
+<div class="fundo-conta" id="fundo-conta" hidden></div>
+<aside class="gaveta" id="gaveta" role="dialog" aria-modal="true" aria-labelledby="gaveta-titulo" hidden>
+  <div class="gaveta-topo">
+    <img src="assets/img/monograma.webp" width="560" height="520" alt="">
+    <h2 id="gaveta-titulo">Sua <em>conta</em></h2>
+    <p id="gaveta-texto">Com a conta você pré-reserva salas e acompanha as suas reservas. Para conhecer a Casa, não precisa de conta.</p>
+    <button class="fechar-gaveta" id="fechar-gaveta" type="button" aria-label="Fechar">×</button>
+  </div>
+  <div id="gaveta-deslogado">
+    <div class="gaveta-abas" role="tablist" aria-label="Entrar ou criar conta">
+      <button type="button" role="tab" id="ab-entrar" aria-controls="f-entrar" aria-selected="true">Entrar</button>
+      <button type="button" role="tab" id="ab-criar" aria-controls="f-criar" aria-selected="false">Criar conta</button>
+    </div>
+    <form id="f-entrar" novalidate>
+      <div class="c-campo"><label for="e-email">E-mail</label><input id="e-email" type="email" autocomplete="username" inputmode="email" placeholder="voce@exemplo.com"><p class="msg" id="e-email-msg" hidden></p></div>
+      <div class="c-campo"><label for="e-senha">Senha</label><div class="caixa-in"><input id="e-senha" type="password" autocomplete="current-password" placeholder="Sua senha"><button class="ver" type="button" aria-controls="e-senha" aria-pressed="false">Mostrar</button></div><p class="msg" id="e-senha-msg" hidden></p></div>
+      <div class="c-linha"><label for="e-lembrar"><input id="e-lembrar" type="checkbox" checked>Manter conectado</label><a href="#" id="esqueci">Esqueci minha senha</a></div>
+      <p class="msg-form" id="e-msg" role="alert" hidden></p>
+      <button class="btn btn-grande" type="submit">Entrar</button>
+      <p class="sem-conta" style="padding:0">Ainda não tem conta? <button type="button" class="link-simples" data-ir-criar>Criar conta</button></p>
+    </form>
+    <form id="f-criar" novalidate hidden>
+      <div class="c-campo"><label for="cr-nome">Nome</label><input id="cr-nome" autocomplete="name" placeholder="Seu nome completo"><p class="msg" id="cr-nome-msg" hidden></p></div>
+      <div class="c-campo"><label for="cr-email">E-mail</label><input id="cr-email" type="email" autocomplete="email" inputmode="email" placeholder="voce@exemplo.com"><p class="msg" id="cr-email-msg" hidden></p></div>
+      <div class="c-campo"><label for="cr-tel">WhatsApp</label><input id="cr-tel" type="tel" inputmode="tel" autocomplete="tel" placeholder="(19) 99999-9999"><p class="msg" id="cr-tel-msg" hidden></p></div>
+      <div class="c-campo"><label for="cr-esp">Especialidade <span>(opcional)</span></label><input id="cr-esp" placeholder="Ex.: Psicologia"></div>
+      <div class="c-campo"><label for="cr-senha">Senha</label><div class="caixa-in"><input id="cr-senha" type="password" autocomplete="new-password" placeholder="Pelo menos 8 caracteres"><button class="ver" type="button" aria-controls="cr-senha" aria-pressed="false">Mostrar</button></div><p class="msg" id="cr-senha-msg" hidden></p></div>
+      <div class="c-campo" id="cr-codigo-wrap" hidden><label for="cr-codigo">Código da equipe</label><input id="cr-codigo" autocomplete="off"><p class="msg" id="cr-codigo-msg" hidden></p></div>
+      <div class="c-linha"><label for="cr-aceite"><input id="cr-aceite" type="checkbox"><span>Li e concordo com os <a href="termos-privacidade.html" target="_blank">Termos e a Política de Privacidade</a>.</span></label></div>
+      <p class="c-campo"><span class="msg" id="cr-aceite-msg" hidden>Marque a caixa para continuar.</span></p>
+      <p class="msg-form" id="cr-msg" role="alert" hidden></p>
+      <button class="btn btn-grande" type="submit">Criar conta</button>
+      <p class="sem-conta" style="padding:0">Já tem conta? <button type="button" class="link-simples" data-ir-entrar>Entrar</button></p>
+    </form>
+    <form id="f-esqueci" novalidate hidden>
+      <h3 class="esq-tit">Esqueceu a <em>senha</em>?</h3>
+      <p class="esq-txt">Fale com a Casa pelo WhatsApp. A equipe cria uma senha nova para você.</p>
+      <a class="btn btn-grande" id="esq-wa" href="contato.html" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5C6.5 2.5 2.2 6.4 2.2 11.2c0 2.6 1.2 4.9 3.2 6.5L4.5 21.5l4.4-2.2c1 .3 2 .4 3.1.4 5.5 0 9.8-3.9 9.8-8.6S17.5 2.5 12 2.5z"/></svg>Falar com a Casa</a>
+      <details class="esq-equipe">
+        <summary>Sou da equipe da Casa</summary>
+        <div class="c-campo"><label for="r-email">E-mail da equipe</label><input id="r-email" type="email" autocomplete="username" inputmode="email"><p class="msg" id="r-email-msg" hidden></p></div>
+        <div class="c-campo"><label for="r-codigo">Código da equipe</label><input id="r-codigo" autocomplete="off"><p class="msg" id="r-codigo-msg" hidden></p></div>
+        <div class="c-campo"><label for="r-nova">Senha nova</label><div class="caixa-in"><input id="r-nova" type="password" autocomplete="new-password" placeholder="Pelo menos 8 caracteres"><button class="ver" type="button" aria-controls="r-nova" aria-pressed="false">Mostrar</button></div><p class="msg" id="r-nova-msg" hidden></p></div>
+        <p class="msg-form" id="r-msg" role="alert" hidden></p>
+        <button class="btn btn-linha" type="submit">Criar senha nova</button>
+      </details>
+      <p class="sem-conta" style="padding:0"><button type="button" class="link-simples" data-ir-entrar>Voltar para entrar</button></p>
+    </form>
+    <p class="sem-conta"><button type="button" class="link-simples" id="sem-conta">Agora não</button></p>
+  </div>
+  <div id="gaveta-logado" hidden>
+    <div class="perfil"><span class="av" id="pf-av" aria-hidden="true"></span><div><strong id="pf-nome"></strong><span id="pf-email"></span><br><span class="chip-equipe" id="pf-equipe" hidden>Equipe da Casa</span></div></div>
+    <div class="pf-painel"><a class="btn btn-grande" id="pf-painel" href="painel.html" hidden>Abrir o painel da Casa</a></div>
+    <form id="f-perfil" novalidate>
+      <div class="c-campo"><label for="p-nome">Nome</label><input id="p-nome" autocomplete="name"><p class="msg" id="p-nome-msg" hidden></p></div>
+      <div class="c-campo"><label for="p-tel">WhatsApp</label><input id="p-tel" type="tel" inputmode="tel" autocomplete="tel"><p class="msg" id="p-tel-msg" hidden></p></div>
+      <div class="c-campo"><label for="p-esp">Especialidade <span>(opcional)</span></label><input id="p-esp"></div>
+      <details class="esq-equipe" id="p-senha">
+        <summary>Trocar a senha</summary>
+        <div class="c-campo"><label for="p-atual">Senha atual</label><div class="caixa-in"><input id="p-atual" type="password" autocomplete="current-password" placeholder="Sua senha de hoje"><button class="ver" type="button" aria-controls="p-atual" aria-pressed="false">Mostrar</button></div><p class="msg" id="p-atual-msg" hidden></p></div>
+        <div class="c-campo"><label for="p-nova">Senha nova</label><div class="caixa-in"><input id="p-nova" type="password" autocomplete="new-password" placeholder="Pelo menos 8 caracteres"><button class="ver" type="button" aria-controls="p-nova" aria-pressed="false">Mostrar</button></div><p class="msg" id="p-nova-msg" hidden></p></div>
+      </details>
+      <p class="msg-form" id="p-msg" role="alert" hidden></p>
+      <button class="btn btn-grande" type="submit">Salvar dados</button>
+      <p class="sem-conta" style="padding:0"><button type="button" class="link-simples" id="p-sair">Sair da conta</button></p>
+    </form>
+  </div>
+</aside>
+<script src="js/conta.js" defer></script>
 </body>
 </html>

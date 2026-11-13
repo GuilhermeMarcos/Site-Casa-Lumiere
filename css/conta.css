@@ -1,0 +1,95 @@
+/* Conta dentro do site: entrar, criar conta, perfil e acesso da equipe */
+
+/* Botão de conta no topo */
+.conta-topo{display:inline-flex;align-items:center;gap:.55rem;background:none;border:0;padding:.45rem .2rem;font-family:var(--display);font-size:1.3rem;line-height:1;color:var(--ink);cursor:pointer;white-space:nowrap}
+.conta-topo svg{width:1.25rem;height:1.25rem;fill:none;stroke:currentColor;stroke-width:1.6}
+.conta-topo:hover{color:var(--bronze-deep)}
+.conta-topo .av{width:2.1rem;height:2.1rem;border-radius:50%;display:grid;place-items:center;background:linear-gradient(120deg, var(--gold-1), var(--gold-3));color:var(--on-gold);font-size:1.1rem;flex:none}
+.conta-topo .nome-curto{max-width:8rem;overflow:hidden;text-overflow:ellipsis}
+.conta-topo .nome-curto{display:none}
+.conta-topo .rot{display:none}
+.conta-topo{padding:.45rem;border-radius:50%}
+.conta-topo:hover{background:rgba(212,162,78,.14)}
+/* topo mais justo para caber o acesso à conta */
+.nav-dir,.nav-dir .nav,.nav-esq{gap:clamp(.9rem, 1.6vw, 1.5rem)}
+.barra .wrap{gap:1rem}
+@media (min-width: 1181px) and (max-width: 1320px){ .nav-link{font-size:1.15rem} .btn-topo{padding:.85em 1.1em} }
+@media (max-width: 640px){
+  .nav-dir{display:flex !important}
+  .nav-dir .btn-topo{display:none}
+  .conta-topo .rot{display:none}
+}
+.menu-conta{position:absolute;right:var(--gutter);top:calc(100% + .5rem);z-index:45;width:min(16rem, calc(100vw - 2rem));background:var(--walnut);color:var(--on-walnut);border-radius:12px;box-shadow:0 0 0 1px rgba(212,162,78,.5), 0 24px 40px -16px rgba(0,0,0,.6);padding:.5rem;animation:subir .25s ease}
+.menu-conta p{padding:.6rem .75rem .7rem;border-bottom:1px solid rgba(212,162,78,.25);margin-bottom:.35rem;font-size:.8125rem;color:var(--on-walnut-muted);line-height:1.4}
+.menu-conta p strong{display:block;font-family:var(--display);font-weight:400;font-size:1.3rem;color:var(--on-walnut)}
+.menu-conta button{display:flex;align-items:center;justify-content:space-between;gap:.5rem;width:100%;background:none;border:0;border-radius:8px;padding:.7rem .75rem;font:500 .9375rem var(--body);color:var(--on-walnut);text-align:left;cursor:pointer}
+.menu-conta button:hover{background:rgba(244,236,223,.08)}
+.menu-conta button small{font-size:.6875rem;font-weight:600;color:var(--gold-1)}
+.menu-conta .sair-conta{color:var(--on-walnut-muted)}
+.mm-conta{background:none;border:0;padding:0;font:600 .9375rem var(--body);color:var(--gold-on-dark);text-decoration:underline;text-underline-offset:.2em;cursor:pointer}
+
+/* Dica dentro do painel da reserva */
+.conta-dica{margin-block:-.4rem 1.2rem;padding:.8rem .95rem;border-radius:10px;background:rgba(244,236,223,.06);box-shadow:inset 0 0 0 1px rgba(212,162,78,.3);font-size:.875rem;line-height:1.5;color:var(--on-walnut-muted)}
+.conta-dica button{background:none;border:0;padding:0;font:inherit;font-weight:600;color:var(--gold-1);text-decoration:underline;text-underline-offset:.2em;cursor:pointer}
+.conta-dica strong{color:var(--on-walnut);font-weight:600}
+
+/* Gaveta de conta */
+.fundo-conta{position:fixed;inset:0;z-index:80;background:rgba(20,12,8,.55);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);animation:aparecer .3s ease}
+@keyframes aparecer{from{opacity:0}}
+.gaveta{position:fixed;top:0;right:0;bottom:0;z-index:81;width:min(30rem, 100vw);display:flex;flex-direction:column;overflow-y:auto;background:var(--parch);box-shadow:-30px 0 60px -20px rgba(20,12,8,.5);animation:entrarGaveta .45s cubic-bezier(.2,.8,.2,1)}
+@keyframes entrarGaveta{from{transform:translateX(100%)}}
+.gaveta-topo{position:relative;padding:1.4rem 1.5rem 1.6rem;background:radial-gradient(circle at 80% 0%, rgba(255,210,130,.3), transparent 55%), linear-gradient(rgba(20,12,8,.78), rgba(20,12,8,.88)), var(--brick), var(--walnut-2);color:var(--on-walnut);border-bottom:3px solid var(--gold-3)}
+.gaveta-topo img{width:3rem;height:auto}
+.gaveta-topo h2{font-size:2.2rem;margin-top:.9rem}
+.gaveta-topo h2 em{color:var(--gold-1)}
+.gaveta-topo p{color:var(--on-walnut-muted);font-size:.9375rem;margin-top:.35rem;max-width:34ch}
+.fechar-gaveta{position:absolute;top:1rem;right:1rem;width:2.6rem;height:2.6rem;border-radius:50%;border:0;background:none;color:var(--on-walnut);box-shadow:inset 0 0 0 1px var(--gold-2);font:400 1.5rem/1 var(--display);cursor:pointer}
+.gaveta-abas{display:flex;gap:1.75rem;padding:0 1.5rem;border-bottom:1px solid var(--line)}
+.gaveta-abas button{position:relative;background:none;border:0;padding:1.05rem .1rem .9rem;font-family:var(--display);font-size:1.35rem;color:var(--muted);cursor:pointer}
+.gaveta-abas button::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;background:var(--gold-2);transform:scaleX(0);transition:transform .3s ease}
+.gaveta-abas button[aria-selected="true"]{color:var(--ink);font-style:italic}
+.gaveta-abas button[aria-selected="true"]::after{transform:scaleX(1)}
+.gaveta form{display:flex;flex-direction:column;gap:1.1rem;padding:1.5rem}
+.c-campo{display:flex;flex-direction:column;gap:.35rem}
+.c-campo label{font-size:.875rem;font-weight:600;color:var(--bronze-deep)}
+.c-campo label span{font-weight:500;color:var(--muted)}
+.c-campo .caixa-in{position:relative;display:flex;align-items:center}
+.c-campo input,.c-campo select{font:inherit;color:var(--ink);width:100%;background:#FBF7F0;border:0;border-radius:10px;box-shadow:inset 0 0 0 1px var(--line);padding:.85rem .95rem}
+.c-campo input:focus,.c-campo select:focus{outline:none;box-shadow:inset 0 0 0 2px var(--gold-2)}
+.c-campo input[aria-invalid="true"]{box-shadow:inset 0 0 0 2px #B0563E}
+.c-campo .ver{position:absolute;right:.45rem;background:none;border:0;font:600 .8125rem var(--body);color:var(--bronze-deep);padding:.5rem .6rem;border-radius:6px;cursor:pointer}
+.c-campo .msg{font-size:.8125rem;color:#8E3B2A}
+.c-linha{display:flex;justify-content:space-between;align-items:center;gap:.75rem;flex-wrap:wrap;font-size:.9375rem}
+.c-linha label{display:flex;align-items:flex-start;gap:.55rem;cursor:pointer;line-height:1.45}
+.c-linha input{accent-color:var(--gold-3);width:1.05rem;height:1.05rem;margin-top:.15rem;flex:none}
+.c-linha a,.link-simples{color:var(--bronze-deep);background:none;border:0;padding:0;font:inherit;text-decoration:underline;text-underline-offset:.2em;cursor:pointer}
+.gaveta form .btn{width:100%}
+.sem-conta{text-align:center;font-size:.9375rem;color:var(--muted);padding:0 1.5rem}
+.perfil{display:flex;align-items:center;gap:1rem;padding:1.5rem 1.5rem 0}
+.perfil .av{width:3.4rem;height:3.4rem;border-radius:50%;display:grid;place-items:center;background:linear-gradient(120deg, var(--gold-1), var(--gold-3));color:var(--on-gold);font-family:var(--display);font-size:1.7rem;flex:none}
+.perfil strong{display:block;font-family:var(--display);font-weight:400;font-size:1.6rem;line-height:1.1}
+.perfil span{font-size:.875rem;color:var(--muted)}
+.chip-equipe{display:inline-block;margin-top:.3rem;font-size:.6875rem;font-weight:700;color:var(--on-gold);background:var(--gold-2);border-radius:999px;padding:.2em .7em}
+
+/* Aviso rápido */
+.aviso-conta{position:fixed;left:50%;bottom:calc(1.25rem + var(--cookie-h, 0px) + env(safe-area-inset-bottom, 0px));transform:translateX(-50%);z-index:95;display:flex;align-items:center;gap:.8rem;max-width:min(26rem, calc(100vw - 2rem));padding:.9rem 1.1rem;border-radius:10px;background:var(--walnut);color:var(--on-walnut);box-shadow:0 0 0 1px rgba(212,162,78,.55), 0 20px 40px -16px rgba(0,0,0,.6);font-size:.9375rem;animation:subir .4s ease}
+.aviso-conta img{width:2rem;height:auto}
+
+/* Conta de verdade: mensagens, senha esquecida e troca de senha */
+.msg-form{margin:0;padding:.75rem .9rem;border-radius:10px;background:rgba(142,59,42,.08);box-shadow:inset 0 0 0 1px rgba(142,59,42,.35);font-size:.875rem;line-height:1.5;color:#8E3B2A}
+.gaveta form .btn[disabled]{opacity:.65;cursor:progress}
+.c-linha label a{color:var(--bronze-deep)}
+.gaveta-abas[hidden]{display:none}
+.esq-tit{font-size:1.9rem;line-height:1.1}
+.esq-tit em{color:var(--bronze)}
+.esq-txt{font-size:.9375rem;line-height:1.55;color:var(--muted);margin-top:-.4rem}
+.gaveta .btn svg{width:1.15em;height:1.15em;fill:currentColor}
+.esq-equipe{border-top:1px solid var(--line);padding-top:.9rem}
+.esq-equipe summary{cursor:pointer;font-weight:600;font-size:.9375rem;color:var(--bronze-deep);padding:.2rem 0;list-style-position:inside}
+.esq-equipe[open]{display:flex;flex-direction:column;gap:1rem}
+.esq-equipe .btn-linha{align-self:flex-start}
+.pf-painel{padding:1.25rem 1.5rem 0}
+.pf-painel .btn{width:100%}
+.pf-painel .btn[hidden]{display:none}
+.gaveta .btn-linha{background:transparent;color:var(--bronze-deep);box-shadow:inset 0 0 0 1.5px var(--bronze)}
+.gaveta .btn-linha::after{display:none}
