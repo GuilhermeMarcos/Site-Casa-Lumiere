@@ -15,18 +15,22 @@ before(async () => {
 after(() => servidor.close());
 
 // Cliente com cookie próprio, como um navegador
-function cliente() {
+let ipSeq = 1;
+function cliente(ip = `10.0.0.${ipSeq++}`) {
   let cookie = '';
-  return async (metodo, caminho, corpo, extra = {}) => {
+  const f = async (metodo, caminho, corpo, extra = {}) => {
     const r = await fetch(base + caminho, {
       method: metodo,
-      headers: { 'Content-Type': 'application/json', ...(cookie ? { Cookie: cookie } : {}), ...extra },
+      headers: { 'Content-Type': 'application/json', 'x-real-ip': ip, ...(cookie ? { Cookie: cookie } : {}), ...extra },
       body: corpo ? JSON.stringify(corpo) : undefined,
     });
     const sc = r.headers.get('set-cookie');
     if (sc) cookie = sc.split(';')[0].endsWith('=') ? '' : sc.split(';')[0];
     return { status: r.status, dados: await r.json() };
   };
+  f.cookie = () => cookie;
+  f.usarCookie = (c) => { cookie = c; };
+  return f;
 }
 
 // Um dia livre de horário fixo, alguns dias à frente, numa terça-feira não (Esmeralda tem fixo)

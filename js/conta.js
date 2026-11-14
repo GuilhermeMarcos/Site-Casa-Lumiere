@@ -107,6 +107,7 @@
       $('pf-equipe').hidden = !conta.equipe; $('pf-painel').hidden = !conta.equipe;
       $('p-nome').value = conta.nome || ''; $('p-tel').value = conta.telefone || ''; $('p-esp').value = conta.especialidade || '';
       $('p-atual').value = ''; $('p-nova').value = ''; $('p-senha').open = false;
+      $('x-senha').value = ''; $('x-det').open = false; $('f-excluir').hidden = !!conta.equipe;
       $('gaveta-titulo').innerHTML = 'Minha <em>conta</em>';
     } else {
       $('gaveta-titulo').innerHTML = 'Sua <em>conta</em>';
@@ -237,6 +238,21 @@
     }).catch(function(err){ ocupado(f, false); msgForm('p-msg', err.message); });
   });
   $('p-sair').addEventListener('click', function(){ fechar(); sair(); });
+
+  /* Excluir a própria conta (LGPD) */
+  $('f-excluir').addEventListener('submit', function(e){
+    e.preventDefault(); msgForm('x-msg', '');
+    var se = $('x-senha').value;
+    if(!checar([['x-senha', !!se, 'Digite a sua senha para confirmar.']])) return;
+    var f = this, b = f.querySelector('button[type="submit"]');
+    if(!b.dataset.confirma){ b.dataset.confirma = '1'; b.textContent = 'Toque de novo para excluir'; return; }
+    ocupado(f, true, 'Excluindo…');
+    api('POST', '/api/auth/excluir', {senha: se}).then(function(){
+      ocupado(f, false); delete b.dataset.confirma; b.textContent = 'Excluir minha conta'; $('x-senha').value = '';
+      conta = null; try{ localStorage.removeItem('cl-ja-entrou'); }catch(er){}
+      mudou(); fechar(); aviso('Sua conta foi excluída.');
+    }).catch(function(err){ ocupado(f, false); delete b.dataset.confirma; b.textContent = 'Excluir minha conta'; msgForm('x-msg', err.message); });
+  });
   function sair(){
     api('POST', '/api/auth/sair').catch(function(){}).then(function(){ conta = null; mudou(); aviso('Você saiu da sua conta.'); });
   }

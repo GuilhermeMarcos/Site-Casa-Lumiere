@@ -18,10 +18,14 @@ export function enviar(res, status, dados, cabecalhos = {}) {
 
 export async function lerCorpo(req) {
   // Na Vercel o corpo já vem lido em req.body; no servidor local lemos o stream
-  if (req.body !== undefined && req.body !== null) {
-    if (typeof req.body === 'string') return req.body ? JSON.parse(req.body) : {};
-    if (Buffer.isBuffer(req.body)) return req.body.length ? JSON.parse(req.body.toString('utf8')) : {};
-    return req.body;
+  let pronto;
+  try { pronto = req.body; } catch { throw new Falha(400, 'json_invalido', 'Os dados enviados não estão no formato certo.'); }
+  if (pronto !== undefined && pronto !== null) {
+    try {
+      if (typeof pronto === 'string') pronto = pronto ? JSON.parse(pronto) : {};
+      else if (Buffer.isBuffer(pronto)) pronto = pronto.length ? JSON.parse(pronto.toString('utf8')) : {};
+    } catch { throw new Falha(400, 'json_invalido', 'Os dados enviados não estão no formato certo.'); }
+    return objeto(pronto);
   }
   const partes = [];
   let total = 0;
@@ -32,7 +36,15 @@ export async function lerCorpo(req) {
   }
   const texto = Buffer.concat(partes).toString('utf8');
   if (!texto) return {};
-  try { return JSON.parse(texto); } catch { throw new Falha(400, 'json_invalido', 'Os dados enviados não estão no formato certo.'); }
+  try { return objeto(JSON.parse(texto)); } catch (e) { if (e instanceof Falha) throw e; throw new Falha(400, 'json_invalido', 'Os dados enviados não estão no formato certo.'); }
+}
+
+// O corpo precisa ser um objeto simples (nada de lista, texto solto ou __proto__)
+function objeto(v) {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) throw new Falha(400, 'json_invalido', 'Os dados enviados não estão no formato certo.');
+  const limpo = {};
+  for (const [k, x] of Object.entries(v)) if (k !== '__proto__' && k !== 'constructor' && k !== 'prototype') limpo[k] = x;
+  return limpo;
 }
 
 export function lerCookies(req) {
@@ -41,9 +53,17 @@ export function lerCookies(req) {
   for (const parte of bruto.split(';')) {
     const i = parte.indexOf('=');
     if (i < 0) continue;
-    out[parte.slice(0, i).trim()] = decodeURIComponent(parte.slice(i + 1).trim());
+    const valor = parte.slice(i + 1).trim();
+    try { out[parte.slice(0, i).trim()] = decodeURIComponent(valor); } catch { /* cookie malformado: ignora */ }
   }
   return out;
+}
+
+// IP de quem fez o pedido. Na Vercel, x-real-ip e x-forwarded-for são preenchidos pela própria Vercel.
+export function ipDe(req) {
+  const h = req.headers || {};
+  const ip = h['x-vercel-forwarded-for'] || h['x-real-ip'] || String(h['x-forwarded-for'] || '').split(',')[0].trim() || (req.socket && req.socket.remoteAddress) || '?';
+  return String(ip).slice(0, 64);
 }
 
 export function texto(v, max = 200) {

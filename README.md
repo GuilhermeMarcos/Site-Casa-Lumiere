@@ -7,6 +7,7 @@ Site da Casa Lumière (Holambra-SP) com agendamento de salas por hora, conta de 
 - Painel da equipe: `painel.html`. Confirma pré-reservas, cria reservas feitas pelo WhatsApp, altera salas, fotos, horários fixos e funcionamento.
 - Backend: `api/` (função da Vercel em Node), banco Postgres (Neon) e fotos no Vercel Blob.
 - Requisitos, MVP e sprints: `docs/PROJETO.md`.
+- Segurança: `docs/SEGURANCA.md` (o que o sistema faz e o que depende de você).
 
 ## Colocar no ar pela Vercel (uma vez só)
 
@@ -29,7 +30,7 @@ Precisa do Node 20 ou mais novo.
 
 ```bash
 npm install
-npm test        # testes da API com um banco em memória
+npm test        # testes da API e testes de ataque, com um banco em memória
 npm run dev     # site em http://localhost:3000
 ```
 

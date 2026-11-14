@@ -4,8 +4,9 @@ import { q, tx, violouUnico } from './db.js';
 import { Falha, texto } from './http.js';
 import {
   gerarHash, conferirSenha, cookieSessao, cookieSair, publico, usuarioAtual, exigirLogin, exigirEquipe,
-  ehEquipe, checarBloqueio, registrarFalha, limparFalhas, codigoEquipeConfere,
+  ehEquipe, checarBloqueio, registrarFalha, limparFalhas, codigoEquipeConfere, checarSenhaNova, limitar,
 } from './auth.js';
+import { ipDe } from './http.js';
 import { agoraLocal, dataValida, diaSemana, somarDias, fixoOcupa, horasValidas } from './agenda.js';
 import { GERAL_PADRAO } from './esquema.js';
 import { guardarFoto } from './armazenamento.js';
@@ -89,10 +90,11 @@ async function cadastro(req, _p, c) {
   if (nome.length < 2) throw new Falha(400, 'nome', 'Digite o seu nome.');
   if (!emailOk(email)) throw new Falha(400, 'email', 'Digite um e-mail válido.');
   if (!telefoneOk(telefone)) throw new Falha(400, 'telefone', 'Digite o WhatsApp com DDD.');
-  if (senha.length < 8 || senha.length > 200) throw new Falha(400, 'senha', 'A senha precisa ter pelo menos 8 caracteres.');
+  checarSenhaNova(senha, email);
+  await limitar('cadastro|' + ipDe(req), 10, 3600, 'Muitas contas criadas daqui em pouco tempo. Tente de novo mais tarde.');
   if (ehEquipe(email) && !codigoEquipeConfere(c.codigoEquipe)) {
-    await checarBloqueio(email);
-    if (c.codigoEquipe) await registrarFalha(email);
+    await checarBloqueio(email, req);
+    if (c.codigoEquipe) await registrarFalha(email, req);
     throw new Falha(403, 'codigo_equipe', c.codigoEquipe ? 'O código da equipe não confere.' : 'Este e-mail é da equipe da Casa. Digite o código da equipe para criar a conta.');
   }
   const id = randomUUID();
@@ -103,20 +105,21 @@ async function cadastro(req, _p, c) {
     if (violouUnico(e)) throw new Falha(409, 'email_existe', 'Já existe uma conta com este e-mail. Use "Entrar".');
     throw e;
   }
-  return [201, { conta: publico({ id, nome, email, telefone, especialidade }) }, { 'Set-Cookie': cookieSessao(req, id, c.lembrar !== false) }];
+  return [201, { conta: publico({ id, nome, email, telefone, especialidade }) }, { 'Set-Cookie': cookieSessao(req, id, 0, c.lembrar !== false) }];
 }
 
 async function entrar(req, _p, c) {
   const email = texto(c.email, 120).toLowerCase(), senha = String(c.senha || '');
   if (!email || !senha) throw new Falha(400, 'campos', 'Digite o e-mail e a senha.');
-  await checarBloqueio(email);
-  const [u] = await q('SELECT id, nome, email, telefone, especialidade, senha_hash FROM usuarios WHERE email = $1', [email]);
-  if (!u || !(await conferirSenha(senha, u.senha_hash))) {
-    await registrarFalha(email);
+  await limitar('entrar|' + ipDe(req), 40, 900);
+  await checarBloqueio(email, req);
+  const [u] = await q('SELECT id, nome, email, telefone, especialidade, senha_hash, sessao_versao FROM usuarios WHERE email = $1', [email]);
+  if (!(await conferirSenha(senha, u && u.senha_hash)) || !u) {
+    await registrarFalha(email, req);
     throw new Falha(401, 'senha', 'E-mail ou senha incorretos.');
   }
-  await limparFalhas(email);
-  return [200, { conta: publico(u) }, { 'Set-Cookie': cookieSessao(req, u.id, !!c.lembrar) }];
+  await limparFalhas(email, req);
+  return [200, { conta: publico(u) }, { 'Set-Cookie': cookieSessao(req, u.id, u.sessao_versao, !!c.lembrar) }];
 }
 
 const sair = async (req) => [200, { ok: true }, { 'Set-Cookie': cookieSair(req) }];
@@ -133,28 +136,48 @@ async function atualizarEu(req, _p, c) {
   const especialidade = c.especialidade !== undefined ? texto(c.especialidade, 80) : u.especialidade;
   if (nome.length < 2) throw new Falha(400, 'nome', 'Digite o seu nome.');
   if (!telefoneOk(telefone)) throw new Falha(400, 'telefone', 'Digite o WhatsApp com DDD.');
+  let cab;
   if (c.senhaNova) {
     const nova = String(c.senhaNova);
-    if (nova.length < 8 || nova.length > 200) throw new Falha(400, 'senha', 'A senha nova precisa ter pelo menos 8 caracteres.');
+    checarSenhaNova(nova, u.email);
+    await limitar('trocar-senha|' + u.id, 10, 900);
     const [s] = await q('SELECT senha_hash FROM usuarios WHERE id = $1', [u.id]);
     if (!(await conferirSenha(String(c.senhaAtual || ''), s.senha_hash))) throw new Falha(400, 'senha_atual', 'A senha atual não confere.');
-    await q('UPDATE usuarios SET senha_hash = $2 WHERE id = $1', [u.id, await gerarHash(nova)]);
+    // Senha nova derruba as sessões abertas em outros aparelhos; este aparelho recebe um cookie novo
+    const [r] = await q('UPDATE usuarios SET senha_hash = $2, sessao_versao = sessao_versao + 1 WHERE id = $1 RETURNING sessao_versao', [u.id, await gerarHash(nova)]);
+    cab = { 'Set-Cookie': cookieSessao(req, u.id, r.sessao_versao, true) };
   }
   await q('UPDATE usuarios SET nome = $2, telefone = $3, especialidade = $4 WHERE id = $1', [u.id, nome, telefone, especialidade]);
-  return [200, { conta: publico({ ...u, nome, telefone, especialidade }) }];
+  return [200, { conta: publico({ ...u, nome, telefone, especialidade }) }, cab];
 }
 
 // A equipe esqueceu a senha: com o código da equipe, cria uma senha nova
 async function redefinirEquipe(req, _p, c) {
   const email = texto(c.email, 120).toLowerCase(), nova = String(c.senhaNova || '');
   if (!ehEquipe(email)) throw new Falha(400, 'nao_equipe', 'Este e-mail não é da equipe. Clientes pedem a senha nova para a Casa pelo WhatsApp.');
-  await checarBloqueio(email);
-  if (!codigoEquipeConfere(c.codigo)) { await registrarFalha(email); throw new Falha(403, 'codigo_equipe', 'O código da equipe não confere.'); }
-  if (nova.length < 8 || nova.length > 200) throw new Falha(400, 'senha', 'A senha nova precisa ter pelo menos 8 caracteres.');
-  const r = await q('UPDATE usuarios SET senha_hash = $2 WHERE email = $1 RETURNING id', [email, await gerarHash(nova)]);
+  await limitar('redefinir|' + ipDe(req), 10, 3600);
+  await checarBloqueio(email, req);
+  if (!codigoEquipeConfere(c.codigo)) { await registrarFalha(email, req); throw new Falha(403, 'codigo_equipe', 'O código da equipe não confere.'); }
+  checarSenhaNova(nova, email);
+  const r = await q('UPDATE usuarios SET senha_hash = $2, sessao_versao = sessao_versao + 1 WHERE email = $1 RETURNING id', [email, await gerarHash(nova)]);
   if (!r.length) throw new Falha(404, 'sem_conta', 'Ainda não existe conta com este e-mail. Use "Criar conta".');
-  await limparFalhas(email);
+  await limparFalhas(email, req);
   return [200, { ok: true }];
+}
+
+// LGPD: a pessoa apaga a própria conta. Pré-reservas abertas somem; reservas confirmadas ficam só com nome e
+// telefone para a Casa honrar o horário, sem ligação com a conta.
+async function excluirEu(req, _p, c) {
+  const u = await exigirLogin(req);
+  if (ehEquipe(u.email)) throw new Falha(400, 'equipe', 'A conta da equipe não pode ser apagada pelo site.');
+  await limitar('excluir|' + u.id, 10, 900);
+  const [s] = await q('SELECT senha_hash FROM usuarios WHERE id = $1', [u.id]);
+  if (!(await conferirSenha(String(c.senha || ''), s.senha_hash))) throw new Falha(400, 'senha_atual', 'A senha não confere.');
+  await tx([
+    ["DELETE FROM reservas WHERE usuario_id = $1 AND status <> 'confirmada'", [u.id]],
+    ['DELETE FROM usuarios WHERE id = $1', [u.id]],
+  ]);
+  return [200, { ok: true }, { 'Set-Cookie': cookieSair(req) }];
 }
 
 /* ===== Reservas do cliente ===== */
@@ -170,6 +193,7 @@ async function minhas(req) {
 async function preReservar(req, _p, c) {
   const u = await exigirLogin(req);
   if (!telefoneOk(u.telefone)) throw new Falha(400, 'telefone', 'Coloque o seu WhatsApp na sua conta antes de reservar.');
+  await limitar('pre|' + ipDe(req), 20, 3600, 'Muitas pré-reservas daqui em pouco tempo. Fale com a Agatha pelo WhatsApp.');
   const v = await validarPedido({ sala: texto(c.sala, 40), data: texto(c.data, 10), horas: c.horas }, { equipe: false });
   const [abertas] = await q("SELECT count(*)::int AS n FROM reservas WHERE usuario_id = $1 AND status = 'pre'", [u.id]);
   if (abertas.n >= MAX_PRE_POR_CLIENTE) throw new Falha(429, 'limite_pre', 'Você já tem pré-reservas esperando a Agatha. Fale com ela antes de fazer outra.');
@@ -359,10 +383,10 @@ async function salvarConfig(req, _p, c) {
 async function senhaCliente(req, _p, c) {
   await exigirEquipe(req);
   const email = texto(c.email, 120).toLowerCase(), nova = String(c.senhaNova || '');
-  if (nova.length < 8) throw new Falha(400, 'senha', 'A senha nova precisa ter pelo menos 8 caracteres.');
-  const r = await q('UPDATE usuarios SET senha_hash = $2 WHERE email = $1 RETURNING nome', [email, await gerarHash(nova)]);
+  checarSenhaNova(nova, email);
+  const r = await q('UPDATE usuarios SET senha_hash = $2, sessao_versao = sessao_versao + 1 WHERE email = $1 RETURNING nome', [email, await gerarHash(nova)]);
   if (!r.length) throw new Falha(404, 'sem_conta', 'Não existe conta com este e-mail.');
-  await limparFalhas(email);
+  await q("DELETE FROM tentativas WHERE split_part(email, '|', 1) = $1", [email]);
   return [200, { nome: r[0].nome }];
 }
 
@@ -374,6 +398,7 @@ export const ROTAS = [
   ['POST', '/api/auth/sair', sair],
   ['GET', '/api/auth/eu', eu],
   ['PATCH', '/api/auth/eu', atualizarEu],
+  ['POST', '/api/auth/excluir', excluirEu],
   ['POST', '/api/auth/redefinir-equipe', redefinirEquipe],
   ['GET', '/api/reservas', minhas],
   ['POST', '/api/reservas', preReservar],

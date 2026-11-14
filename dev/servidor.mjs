@@ -22,8 +22,16 @@ const TIPOS = {
   '.webp': 'image/webp', '.png': 'image/png', '.jpg': 'image/jpeg', '.xml': 'application/xml', '.txt': 'text/plain',
 };
 
+// Mesmos cabeçalhos de segurança da Vercel (vercel.json), para testar igual ao site no ar
+const CABECALHOS = JSON.parse(await readFile(join(RAIZ, 'vercel.json'), 'utf8')).headers
+  .map((h) => ({ re: new RegExp('^' + h.source + '$'), lista: h.headers }));
+
 http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://local');
+  for (const h of CABECALHOS) if (h.re.test(url.pathname)) for (const { key, value } of h.lista) {
+    if (key === 'Strict-Transport-Security') continue;
+    res.setHeader(key, key === 'Content-Security-Policy' ? value.replace('; upgrade-insecure-requests', '') : value);
+  }
   if (url.pathname.startsWith('/api/')) return handler(req, res);
   let arquivo = url.pathname === '/' ? '/index.html' : decodeURIComponent(url.pathname);
   const base = arquivo.startsWith('/dev-uploads/') ? UPLOADS : RAIZ;
