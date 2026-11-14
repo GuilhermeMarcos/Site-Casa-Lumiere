@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "node dev/servidor.mjs",
-    "test": "node --test dev/testes.mjs"
+    "test": "node --test dev/testes.mjs dev/ataques.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.0",
@@ -16,5 +16,8 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.3.0"
+  },
+  "overrides": {
+    "zod": "^4.6.6"
   }
 }

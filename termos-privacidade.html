@@ -30,7 +30,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Montserrat:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="css/style.css">
 <link rel="stylesheet" href="css/conta.css">
-<script>(function(){var d=document.documentElement;d.classList.add('js');try{if(!sessionStorage.getItem('cl-visitou')){d.classList.add('primeira')}sessionStorage.setItem('cl-visitou','1')}catch(e){}})();</script>
+<script src="js/inicio.js"></script>
 <script src="js/main.js" defer></script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Início", "item": "https://casalumiere.com.br/"}, {"@type": "ListItem", "position": 2, "name": "Termos e Privacidade", "item": "https://casalumiere.com.br/termos-privacidade.html"}]}</script>
 </head>
@@ -161,6 +161,15 @@
       <p class="msg-form" id="p-msg" role="alert" hidden></p>
       <button class="btn btn-grande" type="submit">Salvar dados</button>
       <p class="sem-conta" style="padding:0"><button type="button" class="link-simples" id="p-sair">Sair da conta</button></p>
+    </form>
+    <form id="f-excluir" novalidate>
+      <details class="esq-equipe" id="x-det">
+        <summary>Excluir minha conta</summary>
+        <p class="esq-txt">Apaga a sua conta e as pré-reservas que ainda esperam confirmação. Reservas já confirmadas continuam com a Casa para o seu horário ser respeitado.</p>
+        <div class="c-campo"><label for="x-senha">Confirme com a sua senha</label><div class="caixa-in"><input id="x-senha" type="password" autocomplete="current-password" placeholder="Sua senha"><button class="ver" type="button" aria-controls="x-senha" aria-pressed="false">Mostrar</button></div><p class="msg" id="x-senha-msg" hidden></p></div>
+        <p class="msg-form" id="x-msg" role="alert" hidden></p>
+        <button class="btn btn-linha" type="submit">Excluir minha conta</button>
+      </details>
     </form>
   </div>
 </aside>

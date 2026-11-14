@@ -43,6 +43,10 @@ export default async function handler(req, res) {
     }
     if (!achou) throw new Falha(outroMetodo ? 405 : 404, 'rota', 'Endereço não encontrado.');
     if (metodo !== 'GET' && !mesmaOrigem(req)) throw new Falha(403, 'origem', 'Pedido recusado.');
+    // Formulários de outros sites não conseguem mandar JSON sem passar pela checagem do navegador (CORS)
+    const tipo = String(req.headers['content-type'] || '');
+    const temCorpo = Number(req.headers['content-length'] || 0) > 0 || !!req.headers['transfer-encoding'];
+    if (metodo !== 'GET' && temCorpo && !tipo.toLowerCase().startsWith('application/json')) throw new Falha(415, 'tipo', 'Pedido recusado.');
     const corpo = metodo === 'GET' || metodo === 'DELETE' ? {} : await lerCorpo(req);
     await garantirEsquema();
     const [status, dados, cabecalhos] = await achou.fn(req, params, corpo || {});
