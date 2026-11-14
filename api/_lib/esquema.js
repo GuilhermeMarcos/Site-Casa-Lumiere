@@ -64,6 +64,14 @@ const TABELAS = [
   )`,
   'CREATE INDEX IF NOT EXISTS reserva_horas_reserva ON reserva_horas (reserva_id)',
   'ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS sessao_versao INT NOT NULL DEFAULT 0',
+  `CREATE TABLE IF NOT EXISTS codigos (
+    email TEXT NOT NULL,
+    finalidade TEXT NOT NULL CHECK (finalidade IN ('cadastro', 'senha')),
+    codigo_hash TEXT NOT NULL,
+    tentativas INT NOT NULL DEFAULT 0,
+    expira_em TIMESTAMPTZ NOT NULL,
+    PRIMARY KEY (email, finalidade)
+  )`,
   `CREATE TABLE IF NOT EXISTS limites (
     chave TEXT PRIMARY KEY,
     contagem INT NOT NULL DEFAULT 0,

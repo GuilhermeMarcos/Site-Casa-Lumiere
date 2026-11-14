@@ -8,11 +8,12 @@
   },
   "scripts": {
     "dev": "node dev/servidor.mjs",
-    "test": "node --test dev/testes.mjs dev/ataques.mjs"
+    "test": "node --test dev/testes.mjs dev/ataques.mjs dev/codigos.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.0",
-    "@vercel/blob": "^2.0.0"
+    "@vercel/blob": "^2.0.0",
+    "nodemailer": "~10.3.1"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.3.0"

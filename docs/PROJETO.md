@@ -67,7 +67,9 @@ Regras extras do MVP: cada conta pode ter até 3 pré-reservas esperando confirm
 - [ ] Confirmar com a Casa a regra de cancelamento
 - [x] Tirar o botão de teste da mensagem para a Agatha
 - [x] E-mail da Casa no site inteiro: acasalumiere@gmail.com
-- [ ] Recuperação de senha por e-mail
+- [x] Código por e-mail para confirmar a conta e recuperar a senha (liga quando o e-mail for configurado na Vercel)
+- [x] Revisão de segurança com testes de ataque
+- [x] Cliente pode excluir a própria conta
 - [ ] Lista de clientes no painel
 
 ### Sprint 3

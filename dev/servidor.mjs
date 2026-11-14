@@ -1,6 +1,7 @@
 // Servidor para testar no seu computador, sem Vercel: `npm install` e depois `npm run dev`.
 // Usa um Postgres embutido (PGlite) salvo em dev/.banco e guarda as fotos em dev/uploads.
 // Conta da equipe para teste: crie a conta com o e-mail equipe@casalumiere.com.br e o código "lumiere".
+// O código de confirmação do e-mail aparece aqui no terminal.
 import http from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { join, extname, normalize, dirname } from 'node:path';
@@ -15,7 +16,8 @@ process.env.ADMIN_EMAIL ||= 'equipe@casalumiere.com.br';
 process.env.CODIGO_EQUIPE ||= 'lumiere';
 
 const UPLOADS = join(RAIZ, 'dev', 'uploads');
-await preparar({ pastaBanco: join(RAIZ, 'dev', '.banco'), pastaUploads: UPLOADS });
+// Os códigos de e-mail aparecem aqui no terminal (EMAIL=0 npm run dev desliga a confirmação por e-mail)
+await preparar({ pastaBanco: join(RAIZ, 'dev', '.banco'), pastaUploads: UPLOADS, correio: process.env.EMAIL !== '0', mostrarEmails: true });
 
 const TIPOS = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.svg': 'image/svg+xml',

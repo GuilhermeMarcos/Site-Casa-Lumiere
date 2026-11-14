@@ -26,16 +26,19 @@ Revisão feita em 14/11/2026. Os ataques abaixo são testados automaticamente em
 | Conexão sem cadeado | HSTS: o navegador só usa HTTPS. |
 | Bibliotecas com falha conhecida | `npm audit` sem vulnerabilidades. |
 | Chaves no GitHub | Nenhuma chave no repositório nem no histórico. Elas ficam só nas variáveis da Vercel. |
+| Conta com e-mail de outra pessoa | Com o e-mail configurado, a conta só é criada depois de digitar o código de 6 números que chegou no e-mail. |
+| Recuperar senha | Código de 6 números por e-mail: guardado só como hash, vale 10 minutos, 5 tentativas, uso único. Pedidos limitados por e-mail e por IP. A resposta é a mesma exista conta ou não. |
 | LGPD | O cliente pode excluir a própria conta. Pré-reservas abertas somem junto. |
 
 ## O que depende de você (e é onde a maioria dos ataques acontece)
 
 1. **Verificação em duas etapas** no GitHub, na Vercel, na Neon e no Gmail da Casa (acasalumiere@gmail.com). Quem entra nessas contas entra em tudo.
-2. **`JWT_SECRET` longo e aleatório** (pelo menos 32 caracteres) e **`CODIGO_EQUIPE` difícil** (não use "lumiere", que é só o código de teste local que está público neste repositório).
-3. **Senha forte e única** para a conta da equipe no site, guardada num gerenciador de senhas.
-4. **Não mande chaves por WhatsApp ou print.** Se uma vazar, troque na Vercel e faça Redeploy. Trocar o `JWT_SECRET` desconecta todo mundo, o que é bom nesse caso.
-5. **Repositório privado** (opcional): o código não tem segredos, mas deixar privado esconde detalhes de como o sistema funciona.
-6. **Mantenha as dependências em dia**: rode `npm audit` de vez em quando.
+2. **Senha de app do Gmail** (`GMAIL_SENHA_APP`) só na Vercel. Se vazar, apague em myaccount.google.com/apppasswords e crie outra.
+3. **`JWT_SECRET` longo e aleatório** (pelo menos 32 caracteres) e **`CODIGO_EQUIPE` difícil** (não use "lumiere", que é só o código de teste local que está público neste repositório).
+4. **Senha forte e única** para a conta da equipe no site, guardada num gerenciador de senhas.
+5. **Não mande chaves por WhatsApp ou print.** Se uma vazar, troque na Vercel e faça Redeploy. Trocar o `JWT_SECRET` desconecta todo mundo, o que é bom nesse caso.
+6. **Repositório privado** (opcional): o código não tem segredos, mas deixar privado esconde detalhes de como o sistema funciona.
+7. **Mantenha as dependências em dia**: rode `npm audit` de vez em quando.
 
 ## Limites honestos
 

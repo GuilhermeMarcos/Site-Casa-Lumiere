@@ -7,6 +7,8 @@ import {
   ehEquipe, checarBloqueio, registrarFalha, limparFalhas, codigoEquipeConfere, checarSenhaNova, limitar,
 } from './auth.js';
 import { ipDe } from './http.js';
+import { correioAtivo, enviarEmail, emailCodigo, emailJaTemConta } from './correio.js';
+import { criarCodigo, usarCodigo } from './codigos.js';
 import { agoraLocal, dataValida, diaSemana, somarDias, fixoOcupa, horasValidas } from './agenda.js';
 import { GERAL_PADRAO } from './esquema.js';
 import { guardarFoto } from './armazenamento.js';
@@ -97,6 +99,12 @@ async function cadastro(req, _p, c) {
     if (c.codigoEquipe) await registrarFalha(email, req);
     throw new Falha(403, 'codigo_equipe', c.codigoEquipe ? 'O código da equipe não confere.' : 'Este e-mail é da equipe da Casa. Digite o código da equipe para criar a conta.');
   }
+  // Com o e-mail ligado, a conta só nasce depois de confirmar o código enviado para o e-mail
+  if (correioAtivo()) {
+    const [ja] = await q('SELECT 1 FROM usuarios WHERE email = $1', [email]);
+    if (ja) throw new Falha(409, 'email_existe', 'Já existe uma conta com este e-mail. Use "Entrar".');
+    await usarCodigo(email, 'cadastro', c.codigo);
+  }
   const id = randomUUID();
   try {
     await q('INSERT INTO usuarios (id, nome, email, telefone, especialidade, senha_hash) VALUES ($1, $2, $3, $4, $5, $6)',
@@ -126,7 +134,39 @@ const sair = async (req) => [200, { ok: true }, { 'Set-Cookie': cookieSair(req) 
 
 async function eu(req) {
   const u = await usuarioAtual(req);
-  return [200, { conta: u ? publico(u) : null }];
+  return [200, { conta: u ? publico(u) : null, emailAtivo: correioAtivo() }];
+}
+
+// Envia o código por e-mail. A resposta é sempre a mesma, exista conta ou não, para ninguém descobrir quem é cliente.
+async function pedirCodigo(req, _p, c) {
+  const email = texto(c.email, 120).toLowerCase();
+  const finalidade = c.finalidade === 'senha' ? 'senha' : 'cadastro';
+  if (!emailOk(email)) throw new Falha(400, 'email', 'Digite um e-mail válido.');
+  if (!correioAtivo()) throw new Falha(503, 'sem_email', 'O envio de e-mail ainda não foi configurado. Fale com a Casa pelo WhatsApp.');
+  await limitar('codigo-ip|' + ipDe(req), 15, 3600, 'Muitos códigos pedidos daqui. Tente de novo mais tarde.');
+  const [conta] = await q('SELECT id FROM usuarios WHERE email = $1', [email]);
+  if (finalidade === 'cadastro' && conta) {
+    await limitar('ja-tem-conta|' + email, 1, 600);
+    await enviarEmail({ para: email, ...emailJaTemConta() });
+  } else if (finalidade === 'cadastro' || conta) {
+    const codigo = await criarCodigo(email, finalidade);
+    await enviarEmail({ para: email, ...emailCodigo(finalidade, codigo) });
+  }
+  return [200, { ok: true }];
+}
+
+// Senha nova com o código do e-mail. Desconecta os outros aparelhos e já entra na conta.
+async function recuperarSenha(req, _p, c) {
+  const email = texto(c.email, 120).toLowerCase(), nova = String(c.senhaNova || '');
+  if (!emailOk(email)) throw new Falha(400, 'email', 'Digite um e-mail válido.');
+  checarSenhaNova(nova, email);
+  await limitar('recuperar|' + ipDe(req), 20, 3600);
+  await usarCodigo(email, 'senha', c.codigo);
+  const [u] = await q(`UPDATE usuarios SET senha_hash = $2, sessao_versao = sessao_versao + 1 WHERE email = $1
+    RETURNING id, nome, email, telefone, especialidade, sessao_versao`, [email, await gerarHash(nova)]);
+  if (!u) throw new Falha(400, 'codigo_vencido', 'Esse código venceu ou já foi usado. Peça um novo.');
+  await q("DELETE FROM tentativas WHERE split_part(email, '|', 1) = $1", [email]);
+  return [200, { conta: publico(u) }, { 'Set-Cookie': cookieSessao(req, u.id, u.sessao_versao, true) }];
 }
 
 async function atualizarEu(req, _p, c) {
@@ -400,6 +440,8 @@ export const ROTAS = [
   ['PATCH', '/api/auth/eu', atualizarEu],
   ['POST', '/api/auth/excluir', excluirEu],
   ['POST', '/api/auth/redefinir-equipe', redefinirEquipe],
+  ['POST', '/api/auth/codigo', pedirCodigo],
+  ['POST', '/api/auth/recuperar', recuperarSenha],
   ['GET', '/api/reservas', minhas],
   ['POST', '/api/reservas', preReservar],
   ['DELETE', '/api/reservas/:id', cancelarMinha],
