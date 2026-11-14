@@ -4,7 +4,7 @@
   var d = document, $ = function(id){ return d.getElementById(id); };
   var MONO = 'assets/img/monograma.webp';
   var WA_CASA = '5519992487347';
-  var conta = null, carregada = false, ouvintes = [];
+  var conta = null, carregada = false, ouvintes = [], emailAtivo = false;
   try{ var c0 = JSON.parse(localStorage.getItem('cl-conta') || 'null'); if(c0 && c0.nome) conta = c0; }catch(e){}
 
   function guardar(){
@@ -126,6 +126,7 @@
       $('f-' + x).hidden = x !== k;
     });
     $('f-esqueci').hidden = true;
+    if(k === 'criar' && etapaCriar === 2 && !$('cr-cod').value) mudarEtapaCriar(1);
     d.querySelector('.gaveta-abas').hidden = false;
   }
   $('ab-entrar').addEventListener('click', function(){ aba('entrar'); });
@@ -142,11 +143,15 @@
     e.preventDefault();
     $('f-entrar').hidden = true; $('f-criar').hidden = true; $('f-esqueci').hidden = false;
     d.querySelector('.gaveta-abas').hidden = true;
-    $('r-email').value = $('e-email').value;
+    $('r-email').value = $('e-email').value; $('rc-email').value = $('e-email').value;
     var msg = 'Olá! Esqueci a senha da minha conta no site da Casa Lumière. Meu e-mail: ' + ($('e-email').value.trim() || '');
     $('esq-wa').href = linkWhats(WA_CASA, msg);
     $('esq-wa-web').href = linkWhats(WA_CASA, msg, true);
-    $('esq-wa').focus();
+    /* Com o e-mail ligado, o código chega no e-mail; o WhatsApp fica como alternativa */
+    $('f-recuperar').hidden = !emailAtivo;
+    $('esq-txt-wa').textContent = emailAtivo ? 'Não recebeu o e-mail? Fale com a Casa:' : 'Fale com a Casa pelo WhatsApp. A equipe cria uma senha nova para você.';
+    etapaRecuperar(1);
+    (emailAtivo ? $('rc-email') : $('esq-wa')).focus();
   });
   function linkWhats(num, msg, web){
     return web ? 'https://web.whatsapp.com/send?phone=' + num + '&text=' + encodeURIComponent(msg) : 'https://wa.me/' + num + '?text=' + encodeURIComponent(msg);
@@ -192,27 +197,103 @@
     }).catch(function(err){ ocupado(f, false); msgForm('e-msg', err.message); });
   });
 
+  /* ===== Código por e-mail ===== */
+  function contarReenvio(botao){
+    var s = 60, rot = 'Reenviar código';
+    botao.disabled = true;
+    (function passo(){ if(!botao.isConnected) return; if(s <= 0){ botao.disabled = false; botao.textContent = rot; return; } botao.textContent = rot + ' (' + s + 's)'; s--; setTimeout(passo, 1000); })();
+  }
+  function pedirCodigo(email, finalidade, botaoReenviar){
+    return api('POST', '/api/auth/codigo', {email: email, finalidade: finalidade}).then(function(){ contarReenvio(botaoReenviar); });
+  }
+  var etapaCriar = 1;
+  function mudarEtapaCriar(n){
+    etapaCriar = n;
+    $('cr-etapa2').hidden = n !== 2;
+    $('cr-email').readOnly = n === 2;
+    $('f-criar').querySelector('button[type="submit"]').textContent = (n === 1 && emailAtivo) ? 'Enviar código para o e-mail' : 'Criar conta';
+  }
+  $('cr-trocar').addEventListener('click', function(){ mudarEtapaCriar(1); $('cr-cod').value = ''; $('cr-email').focus(); });
+  $('cr-reenviar').addEventListener('click', function(){
+    msgForm('cr-msg', '');
+    pedirCodigo($('cr-email').value.trim(), 'cadastro', this).then(function(){ aviso('Código reenviado. Confira também o spam.'); }).catch(function(err){ msgForm('cr-msg', err.message); });
+  });
+  [$('cr-cod'), $('rc-cod')].forEach(function(i){ i.addEventListener('input', function(){ i.value = i.value.replace(/\D/g, '').slice(0, 6); }); });
+
   $('f-criar').addEventListener('submit', function(e){
     e.preventDefault(); msgForm('cr-msg', '');
     var nome = $('cr-nome').value.trim(), em = $('cr-email').value, tel = $('cr-tel').value.trim(), se = $('cr-senha').value;
     var ok = checar([['cr-nome', nome.length >= 2, 'Digite o seu nome.'], ['cr-email', emailOk(em), 'Digite um e-mail válido.'], ['cr-tel', tel.replace(/\D/g, '').length >= 10, 'Digite o WhatsApp com DDD.'], ['cr-senha', se.length >= 8, 'A senha precisa ter pelo menos 8 caracteres.']]);
     var aceite = $('cr-aceite').checked; $('cr-aceite-msg').hidden = aceite; if(!aceite) ok = false;
     if(!ok) return;
-    var f = this; ocupado(f, true, 'Criando conta…');
-    var corpo = {nome: nome, email: em.trim(), telefone: tel, especialidade: $('cr-esp').value.trim(), senha: se, lembrar: true};
+    var f = this;
+    if(emailAtivo && etapaCriar === 1){
+      ocupado(f, true, 'Enviando código…');
+      pedirCodigo(em.trim(), 'cadastro', $('cr-reenviar')).then(function(){
+        ocupado(f, false); mudarEtapaCriar(2);
+        $('cr-enviado').textContent = 'Enviamos um código para ' + em.trim() + '. Ele vale por 10 minutos. Se não aparecer, confira o spam.';
+        $('cr-cod').focus();
+      }).catch(function(err){ ocupado(f, false); msgForm('cr-msg', err.message); });
+      return;
+    }
+    if(emailAtivo && !checar([['cr-cod', $('cr-cod').value.length === 6, 'Digite os 6 números do e-mail.']])) return;
+    ocupado(f, true, 'Criando conta…');
+    var corpo = {nome: nome, email: em.trim(), telefone: tel, especialidade: $('cr-esp').value.trim(), senha: se, lembrar: true, codigo: $('cr-cod').value};
     if(!$('cr-codigo-wrap').hidden) corpo.codigoEquipe = $('cr-codigo').value.trim();
     api('POST', '/api/auth/cadastro', corpo).then(function(r){
-      ocupado(f, false); $('cr-senha').value = ''; $('cr-codigo').value = ''; $('cr-codigo-wrap').hidden = true;
+      ocupado(f, false); $('cr-senha').value = ''; $('cr-codigo').value = ''; $('cr-codigo-wrap').hidden = true; $('cr-cod').value = ''; mudarEtapaCriar(1);
       entrou(r.conta, r.conta.equipe ? 'Conta da equipe criada. O painel está no menu da sua conta.' : 'Conta criada. Bem-vindo(a), ' + primeiro(r.conta.nome) + '.');
     }).catch(function(err){
       ocupado(f, false);
       if(err.erro === 'codigo_equipe'){ $('cr-codigo-wrap').hidden = false; $('cr-codigo').focus(); msgForm('cr-codigo-msg', err.message); return; }
-      if(err.erro === 'email_existe'){ checar([['cr-email', false, err.message]]); return; }
+      if(err.erro === 'email_existe'){ mudarEtapaCriar(1); checar([['cr-email', false, err.message]]); return; }
+      if(err.erro === 'codigo_errado'){ checar([['cr-cod', false, err.message]]); $('cr-cod').select(); return; }
+      if(err.erro === 'codigo_vencido'){ $('cr-cod').value = ''; checar([['cr-cod', false, err.message]]); return; }
       msgForm('cr-msg', err.message);
     });
   });
 
-  $('f-esqueci').addEventListener('submit', function(e){
+  /* Recuperar a senha pelo código do e-mail */
+  var etapaRec = 1;
+  function etapaRecuperar(n){
+    etapaRec = n;
+    $('rc-etapa2').hidden = n !== 2;
+    $('rc-email').readOnly = n === 2;
+    $('f-recuperar').querySelector('button[type="submit"]').textContent = n === 1 ? 'Enviar código' : 'Salvar senha nova';
+    if(n === 1){ $('rc-cod').value = ''; $('rc-nova').value = ''; }
+  }
+  $('rc-reenviar').addEventListener('click', function(){
+    msgForm('rc-msg', '');
+    pedirCodigo($('rc-email').value.trim(), 'senha', this).then(function(){ aviso('Código reenviado. Confira também o spam.'); }).catch(function(err){ msgForm('rc-msg', err.message); });
+  });
+  $('f-recuperar').addEventListener('submit', function(e){
+    e.preventDefault(); msgForm('rc-msg', '');
+    var f = this, em = $('rc-email').value.trim();
+    if(etapaRec === 1){
+      if(!checar([['rc-email', emailOk(em), 'Digite o e-mail da sua conta.']])) return;
+      ocupado(f, true, 'Enviando código…');
+      pedirCodigo(em, 'senha', $('rc-reenviar')).then(function(){
+        ocupado(f, false); etapaRecuperar(2);
+        $('rc-enviado').textContent = 'Se existir uma conta com ' + em + ', o código chega em instantes. Ele vale por 10 minutos. Confira também o spam.';
+        $('rc-cod').focus();
+      }).catch(function(err){ ocupado(f, false); msgForm('rc-msg', err.message); });
+      return;
+    }
+    var cod = $('rc-cod').value, nova = $('rc-nova').value;
+    if(!checar([['rc-cod', cod.length === 6, 'Digite os 6 números do e-mail.'], ['rc-nova', nova.length >= 8, 'A senha nova precisa ter pelo menos 8 caracteres.']])) return;
+    ocupado(f, true, 'Salvando…');
+    api('POST', '/api/auth/recuperar', {email: em, codigo: cod, senhaNova: nova}).then(function(r){
+      ocupado(f, false); etapaRecuperar(1);
+      entrou(r.conta, 'Senha nova salva. Você já está na sua conta.');
+    }).catch(function(err){
+      ocupado(f, false);
+      if(err.erro === 'codigo_errado'){ checar([['rc-cod', false, err.message]]); return; }
+      if(err.erro === 'codigo_vencido'){ etapaRecuperar(1); msgForm('rc-msg', err.message); return; }
+      msgForm('rc-msg', err.message);
+    });
+  });
+
+  $('f-equipe-senha').addEventListener('submit', function(e){
     e.preventDefault(); msgForm('r-msg', '');
     var em = $('r-email').value, cod = $('r-codigo').value.trim(), nova = $('r-nova').value;
     if(!checar([['r-email', emailOk(em), 'Digite o e-mail da equipe.'], ['r-codigo', !!cod, 'Digite o código da equipe.'], ['r-nova', nova.length >= 8, 'A senha nova precisa ter pelo menos 8 caracteres.']])) return;
@@ -275,6 +356,6 @@
   };
 
   desenharTopo();
-  api('GET', '/api/auth/eu').then(function(r){ conta = r.conta; }).catch(function(){ /* sem API: segue sem conta */ conta = null; })
+  api('GET', '/api/auth/eu').then(function(r){ conta = r.conta; emailAtivo = !!r.emailAtivo; mudarEtapaCriar(1); }).catch(function(){ /* sem API: segue sem conta */ conta = null; })
     .then(function(){ carregada = true; mudou(); });
 })();

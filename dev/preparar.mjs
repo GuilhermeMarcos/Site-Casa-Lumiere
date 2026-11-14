@@ -4,8 +4,12 @@ import { join } from 'node:path';
 import { PGlite } from '@electric-sql/pglite';
 import { usarBanco } from '../api/_lib/db.js';
 import { usarArmazenamento } from '../api/_lib/armazenamento.js';
+import { usarCorreio } from '../api/_lib/correio.js';
 
-export async function preparar({ pastaBanco, pastaUploads } = {}) {
+// E-mails "enviados" no teste ficam aqui (e aparecem no terminal do npm run dev)
+export const caixaDeEntrada = [];
+
+export async function preparar({ pastaBanco, pastaUploads, correio = false, mostrarEmails = false } = {}) {
   process.env.JWT_SECRET ||= 'segredo-so-para-teste-local-123';
   process.env.ADMIN_EMAIL ||= 'equipe@casalumiere.com.br';
   process.env.CODIGO_EQUIPE ||= 'lumiere';
@@ -26,6 +30,10 @@ export async function preparar({ pastaBanco, pastaUploads } = {}) {
       await writeFile(join(pastaUploads, nome), corpo);
     }
     return '/dev-uploads/' + nome;
+  });
+  if (correio) usarCorreio(async (m) => {
+    caixaDeEntrada.push(m);
+    if (mostrarEmails) console.log(`\n[e-mail para ${m.para}] ${m.assunto}\n`);
   });
   return pg;
 }

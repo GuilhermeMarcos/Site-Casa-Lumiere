@@ -52,6 +52,7 @@ export function checarSenhaNova(senha, email = '') {
    e todos os aparelhos que estavam conectados saem na hora. */
 const b64 = (s) => Buffer.from(s).toString('base64url');
 const assinar = (dados) => createHmac('sha256', segredo()).update(dados).digest('base64url');
+export const assinarTexto = (t) => assinar(t);
 
 function criarToken(uid, versao, segundos) {
   const corpo = b64(JSON.stringify({ u: uid, v: versao || 0, e: Math.floor(Date.now() / 1000) + segundos }));

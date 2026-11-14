@@ -24,6 +24,23 @@ O projeto já está ligado ao GitHub, então cada envio para o repositório publ
 
 Nunca coloque essas chaves em arquivos do repositório. Elas ficam só na Vercel.
 
+## E-mail com código (confirmar conta e recuperar senha)
+
+Enquanto o e-mail não estiver configurado, o site funciona como antes: cria conta sem código e a senha esquecida é resolvida pelo WhatsApp. Quando você configurar um dos dois jeitos abaixo e fizer Redeploy, o código passa a ser pedido sozinho.
+
+**Jeito 1, mais rápido: Gmail da Casa (acasalumiere@gmail.com)**
+1. Entre no Gmail da Casa e ative a **Verificação em duas etapas** em myaccount.google.com/security.
+2. Abra myaccount.google.com/apppasswords, crie uma senha de app chamada "Site Casa Lumière" e copie os 16 caracteres.
+3. Na Vercel, em **Environment Variables**, crie `GMAIL_USUARIO` = `acasalumiere@gmail.com` e `GMAIL_SENHA_APP` = os 16 caracteres.
+4. Faça Redeploy. O Gmail envia até cerca de 500 e-mails por dia, bem mais do que o site precisa.
+
+**Jeito 2, mais profissional: Resend com o domínio (nao-responda@casalumiere.com.br)**
+1. Crie a conta em resend.com, adicione o domínio `casalumiere.com.br` e coloque na Vercel (em **Domains**, DNS) os registros que o Resend mostrar.
+2. Crie uma API key e coloque na Vercel: `RESEND_API_KEY` = a chave e `EMAIL_REMETENTE` = `Casa Lumière <nao-responda@casalumiere.com.br>`.
+3. Faça Redeploy. O plano grátis envia 3.000 e-mails por mês.
+
+Se as duas estiverem configuradas, o site usa o Resend.
+
 ## Testar no computador
 
 Precisa do Node 20 ou mais novo.
@@ -34,7 +51,7 @@ npm test        # testes da API e testes de ataque, com um banco em memória
 npm run dev     # site em http://localhost:3000
 ```
 
-No teste local, a conta da equipe usa o e-mail `equipe@casalumiere.com.br` e o código `lumiere`. O banco local fica em `dev/.banco` (apague a pasta para começar do zero).
+No teste local, a conta da equipe usa o e-mail `equipe@casalumiere.com.br` e o código `lumiere`. Os códigos de e-mail aparecem no terminal do `npm run dev`. O banco local fica em `dev/.banco` (apague a pasta para começar do zero).
 
 ## Como o sistema funciona
 
@@ -47,5 +64,7 @@ No teste local, a conta da equipe usa o e-mail `equipe@casalumiere.com.br` e o c
 | `reserva_horas` | Uma linha por hora ocupada. A chave sala + dia + hora impede reserva dupla |
 | `config` | Funcionamento: horário, dias abertos, antecedência, WhatsApp da Agatha |
 | `tentativas` | Trava de 15 minutos depois de 8 senhas erradas |
+| `codigos` | Códigos de e-mail (só o hash), valem 10 minutos e uma única vez |
+| `limites` | Contadores contra abuso: login, cadastro, códigos e pré-reservas por IP |
 
 O valor por hora fica só no painel. Ele não aparece no site porque é combinado no WhatsApp.
