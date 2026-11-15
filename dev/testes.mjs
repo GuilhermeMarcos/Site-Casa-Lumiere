@@ -204,6 +204,18 @@ test('equipe confirma, edita, cria e remove reservas', async () => {
   assert.equal(r.status, 200);
 });
 
+test('link de 1 clique: só a equipe abre a reserva', async () => {
+  const { dados } = await ana('GET', '/api/reservas');
+  const id = dados.reservas[0].id;
+  assert.equal((await anonimo('GET', '/api/admin/reservas/' + id)).status, 401, 'sem login');
+  assert.equal((await ana('GET', '/api/admin/reservas/' + id)).status, 403, 'nem a própria cliente confirma');
+  const r = await equipe('GET', '/api/admin/reservas/' + id);
+  assert.equal(r.status, 200);
+  assert.equal(r.dados.reserva.id, id);
+  assert.ok(r.dados.reserva.salaNome);
+  assert.equal((await equipe('GET', '/api/admin/reservas/nao-existe')).status, 404);
+});
+
 test('equipe confirma pré-reserva que expirou se o horário continua livre', async () => {
   const { dados } = await bia('GET', '/api/reservas');
   const exp = dados.reservas.find((x) => x.status === 'expirada');

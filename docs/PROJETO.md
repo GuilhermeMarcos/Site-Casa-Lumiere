@@ -126,3 +126,9 @@ Backlog:
 - [x] Extrato mensal para o parceiro em Minhas reservas
 - [x] Reserva pelo painel com parceiro e valor ajustável
 - [x] Testes de cálculo e de fraude (dev/parceiros.mjs)
+
+## Confirmação em 1 clique (14/11/2026)
+
+- [x] A mensagem que o cliente manda para a Agatha traz o link "Para a equipe confirmar"
+- [x] Página leve `confirmar.html`: mostra a reserva, confirma com um toque, recusa e já monta o aviso para o cliente no WhatsApp
+- [x] Só funciona com a conta da equipe conectada; para o cliente o link não faz nada

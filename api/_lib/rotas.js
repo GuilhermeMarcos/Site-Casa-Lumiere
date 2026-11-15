@@ -396,6 +396,17 @@ async function confirmarEquipe(req, p) {
   return [200, { ok: true }];
 }
 
+// Uma reserva só, para a página de confirmação em 1 clique (link que vai na mensagem para a Agatha)
+async function reservaEquipe(req, p) {
+  await exigirEquipe(req);
+  const [, , r] = await tx([...EXPIRAR, [
+    `SELECT ${COLS_RESERVA}, s.nome AS "salaNome", s.tipo AS "salaTipo"
+       FROM reservas r LEFT JOIN salas s ON s.id = r.sala WHERE r.id = $1`, [p.id],
+  ]]);
+  if (!r.length) throw new Falha(404, 'reserva', 'Reserva não encontrada. Ela pode ter sido cancelada.');
+  return [200, { reserva: r[0], agora: agoraLocal() }];
+}
+
 async function removerReservaEquipe(req, p) {
   await exigirEquipe(req);
   await q('DELETE FROM reservas WHERE id = $1', [p.id]);
@@ -643,6 +654,7 @@ export const ROTAS = [
   ['DELETE', '/api/reservas/:id', cancelarMinha],
   ['GET', '/api/admin/dados', dadosEquipe],
   ['POST', '/api/admin/reservas', criarReservaEquipe],
+  ['GET', '/api/admin/reservas/:id', reservaEquipe],
   ['PATCH', '/api/admin/reservas/:id', editarReservaEquipe],
   ['POST', '/api/admin/reservas/:id/confirmar', confirmarEquipe],
   ['DELETE', '/api/admin/reservas/:id', removerReservaEquipe],

@@ -360,7 +360,7 @@
       li.querySelector('h3').textContent = nomeSalaId(r.sala);
       li.querySelector('p').textContent = cap(diaLongo(r.data)) + ', ' + faixa(r.horas) + (r.valor != null ? ' · ' + brl(r.valor) : '');
       var stt = li.querySelector('.status'), acoes = li.querySelector('.acoes');
-      var msg = msgAgatha(r.sala, r.data, r.horas, r.nome, r.especialidade, r.telefone, r.valor, r.descontoPct);
+      var msg = msgAgatha(r.sala, r.data, r.horas, r.nome, r.especialidade, r.telefone, r.valor, r.descontoPct, r.id);
       if(r.status === 'confirmada'){
         stt.className = 'status ok'; stt.textContent = 'Reservada';
         acoes.appendChild(botaoWhats('Olá, Agatha! Sobre a minha reserva da ' + nomeSalaId(r.sala) + ' em ' + diaLongo(r.data) + ', ' + faixa(r.horas) + ':', 'Falar com a Agatha'));
@@ -412,7 +412,7 @@
 
   /* ===== Mensagem para a Agatha ===== */
   var ICONE_WA = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5C6.5 2.5 2.2 6.4 2.2 11.2c0 2.6 1.2 4.9 3.2 6.5L4.5 21.5l4.4-2.2c1 .3 2 .4 3.1.4 5.5 0 9.8-3.9 9.8-8.6S17.5 2.5 12 2.5z"/></svg>';
-  function msgAgatha(salaId, data, horas, nome, esp, tel, valor, descontoPct){
+  function msgAgatha(salaId, data, horas, nome, esp, tel, valor, descontoPct, reservaId){
     var linhas = ['Olá, Agatha! Fiz uma pré-reserva pelo site da Casa Lumière:', '',
       'Sala: ' + nomeSalaId(salaId),
       'Dia: ' + diaLongo(data),
@@ -421,6 +421,8 @@
       'Nome: ' + nome];
     if(esp) linhas.push('Especialidade: ' + esp);
     linhas.push('WhatsApp: ' + tel, '', 'Pode confirmar a reserva e me dizer como faço o pagamento?');
+    /* Link de 1 clique para a Agatha confirmar. Só funciona com a conta da equipe; para o cliente não faz nada. */
+    if(reservaId) linhas.push('', 'Para a equipe confirmar: ' + location.origin + '/confirmar.html?r=' + encodeURIComponent(reservaId));
     return linhas.join('\n');
   }
   /* Duas opções sempre: o WhatsApp normal (aplicativo) e o WhatsApp Web */
@@ -449,7 +451,7 @@
     [['Sala', nomeSalaId(r.sala)], ['Dia', diaLongo(r.data)], ['Horário', faixa(r.horas)], ['Valor', r.valor != null ? brl(r.valor) : 'A combinar']].forEach(function(l){
       var div = d.createElement('div'), dt = d.createElement('dt'), dd = d.createElement('dd'); dt.textContent = l[0]; dd.textContent = l[1]; div.appendChild(dt); div.appendChild(dd); dl.appendChild(div);
     });
-    var texto = msgAgatha(r.sala, r.data, r.horas, r.nome, r.especialidade, r.telefone, r.valor, r.descontoPct);
+    var texto = msgAgatha(r.sala, r.data, r.horas, r.nome, r.especialidade, r.telefone, r.valor, r.descontoPct, r.id);
     var btn = f.querySelector('.wa-app'), web = f.querySelector('.wa-web');
     btn.href = linkAgatha(texto); btn.innerHTML = ICONE_WA + 'WhatsApp';
     web.href = linkAgatha(texto, true);
