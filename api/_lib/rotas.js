@@ -12,6 +12,7 @@ import { criarCodigo, usarCodigo } from './codigos.js';
 import { agoraLocal, dataValida, diaSemana, somarDias, fixoOcupa, horasValidas } from './agenda.js';
 import { GERAL_PADRAO } from './esquema.js';
 import { guardarFoto } from './armazenamento.js';
+import { validarPrecos, calcularValor, comDesconto, porcentagem, dinheiro } from './precos.js';
 
 const EXPIRA_MIN = 90;          // pré-reserva sem confirmação expira em 1h30
 const MAX_PRE_POR_CLIENTE = 3;  // pré-reservas abertas ao mesmo tempo por conta
@@ -22,13 +23,36 @@ const EXPIRAR = [
   ["DELETE FROM reserva_horas h USING reservas r WHERE h.reserva_id = r.id AND r.status = 'expirada'"],
 ];
 const SQL_GERAL = ["SELECT valor FROM config WHERE chave = 'geral'"];
-const SQL_SALAS = ['SELECT id, nome, tipo, descricao, foto_url AS foto, disponivel, ordem, valor_hora::float8 AS "valorHora" FROM salas ORDER BY ordem, nome'];
+const SQL_SALAS = ['SELECT id, nome, tipo, descricao, foto_url AS foto, disponivel, ordem, precos FROM salas ORDER BY ordem, nome'];
 const SQL_FIXOS = ['SELECT id, sala, repete, dia_semana AS "diaSemana", a_cada_dias AS "aCadaDias", de, ate, desde::text AS desde FROM fixos ORDER BY sala, de'];
 const COLS_RESERVA = `r.id, r.sala, r.data::text AS data, r.horas, r.nome, r.especialidade, r.telefone, r.status, r.origem,
-  r.expira_em AS "expiraEm", r.criado_em AS "criadoEm", r.confirmada_em AS "confirmadaEm"`;
+  r.expira_em AS "expiraEm", r.criado_em AS "criadoEm", r.confirmada_em AS "confirmadaEm",
+  r.valor::float8 AS valor, r.valor_cheio::float8 AS "valorCheio", r.desconto_pct::float8 AS "descontoPct", r.parceiro_id AS "parceiroId"`;
+const COLS_PARCEIRO = `p.id, p.email, p.nome, p.desconto_aluguel::float8 AS "descontoAluguel", p.pct_atendimento::float8 AS "pctAtendimento",
+  p.ativo, p.observacao`;
+const COLS_ATENDIMENTO = `a.id, a.parceiro_id AS "parceiroId", a.reserva_id AS "reservaId", a.data::text AS data, a.quantidade,
+  a.valor_total::float8 AS "valorTotal", a.pct::float8 AS pct, a.repasse::float8 AS repasse, a.status, a.recebido_em AS "recebidoEm", a.observacao`;
+
+/* ===== Parceria =====
+   Vale só se a parceria está ativa e a conta é mesmo da pessoa: e-mail confirmado por código
+   ou conta conferida pela equipe no painel. Assim ninguém ganha o desconto criando conta com o e-mail de outra pessoa. */
+async function parceriaDe(u) {
+  if (!u) return null;
+  const [p] = await q(
+    `SELECT ${COLS_PARCEIRO}, (us.email_verificado OR p.usuario_confirmado = us.id) AS valida
+       FROM parceiros p JOIN usuarios us ON us.email = p.email
+      WHERE us.id = $1 AND p.ativo`, [u.id]);
+  return p && p.valida ? p : null;
+}
+
+// Valor da reserva calculado no servidor (o navegador só mostra; nunca decide o preço)
+function precoDaReserva(sala, nHoras, parceria) {
+  const cheio = calcularValor(sala.precos, nHoras);
+  const desc = parceria ? Number(parceria.descontoAluguel) : null;
+  return { valor: parceria ? comDesconto(cheio, desc) : cheio, valorCheio: cheio, descontoPct: desc, parceiroId: parceria ? parceria.id : null };
+}
 
 const geralDe = (linhas) => ({ ...GERAL_PADRAO, ...((linhas[0] && linhas[0].valor) || {}) });
-const semValor = ({ valorHora, ...s }) => s;
 const novoId = (pre) => `${pre}${randomBytes(5).toString('hex')}`;
 
 function soDigitos(v) { return String(v || '').replace(/\D/g, ''); }
@@ -79,10 +103,16 @@ async function agenda(req) {
   return [200, {
     agora,
     geral: { abre: geral.abre, fecha: geral.fecha, diasAFrente: geral.diasAFrente, diasAbertos: geral.diasAbertos, whatsappAgatha: geral.whatsappAgatha },
-    salas: salas.map(semValor),
+    salas,
     fixos,
     ocupados,
+    parceria: await parceriaPublica(u),
   }];
+}
+
+async function parceriaPublica(u) {
+  const p = await parceriaDe(u);
+  return p ? { descontoAluguel: p.descontoAluguel, pctAtendimento: p.pctAtendimento } : null;
 }
 
 /* ===== Conta ===== */
@@ -107,8 +137,8 @@ async function cadastro(req, _p, c) {
   }
   const id = randomUUID();
   try {
-    await q('INSERT INTO usuarios (id, nome, email, telefone, especialidade, senha_hash) VALUES ($1, $2, $3, $4, $5, $6)',
-      [id, nome, email, telefone, especialidade, await gerarHash(senha)]);
+    await q('INSERT INTO usuarios (id, nome, email, telefone, especialidade, senha_hash, email_verificado) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+      [id, nome, email, telefone, especialidade, await gerarHash(senha), correioAtivo()]);
   } catch (e) {
     if (violouUnico(e)) throw new Falha(409, 'email_existe', 'Já existe uma conta com este e-mail. Use "Entrar".');
     throw e;
@@ -162,7 +192,7 @@ async function recuperarSenha(req, _p, c) {
   checarSenhaNova(nova, email);
   await limitar('recuperar|' + ipDe(req), 20, 3600);
   await usarCodigo(email, 'senha', c.codigo);
-  const [u] = await q(`UPDATE usuarios SET senha_hash = $2, sessao_versao = sessao_versao + 1 WHERE email = $1
+  const [u] = await q(`UPDATE usuarios SET senha_hash = $2, sessao_versao = sessao_versao + 1, email_verificado = true WHERE email = $1
     RETURNING id, nome, email, telefone, especialidade, sessao_versao`, [email, await gerarHash(nova)]);
   if (!u) throw new Falha(400, 'codigo_vencido', 'Esse código venceu ou já foi usado. Peça um novo.');
   await q("DELETE FROM tentativas WHERE split_part(email, '|', 1) = $1", [email]);
@@ -239,12 +269,14 @@ async function preReservar(req, _p, c) {
   if (abertas.n >= MAX_PRE_POR_CLIENTE) throw new Falha(429, 'limite_pre', 'Você já tem pré-reservas esperando a Agatha. Fale com ela antes de fazer outra.');
   const id = randomUUID();
   const data = texto(c.data, 10);
+  const preco = precoDaReserva(v.sala, v.horas.length, await parceriaDe(u));
   try {
     await tx([
       ...EXPIRAR,
-      [`INSERT INTO reservas (id, sala, usuario_id, data, horas, nome, especialidade, telefone, status, origem, expira_em)
-        VALUES ($1, $2, $3, $4::date, $5::smallint[], $6, $7, $8, 'pre', 'site', now() + interval '${EXPIRA_MIN} minutes')`,
-      [id, v.sala.id, u.id, data, v.horas, u.nome, u.especialidade, u.telefone]],
+      [`INSERT INTO reservas (id, sala, usuario_id, data, horas, nome, especialidade, telefone, status, origem, expira_em,
+          valor, valor_cheio, desconto_pct, parceiro_id)
+        VALUES ($1, $2, $3, $4::date, $5::smallint[], $6, $7, $8, 'pre', 'site', now() + interval '${EXPIRA_MIN} minutes', $9, $10, $11, $12)`,
+      [id, v.sala.id, u.id, data, v.horas, u.nome, u.especialidade, u.telefone, preco.valor, preco.valorCheio, preco.descontoPct, preco.parceiroId]],
       [INSERIR_HORAS, [v.sala.id, data, v.horas, id]],
     ]);
   } catch (e) { throw ocupado(e); }
@@ -265,12 +297,33 @@ async function cancelarMinha(req, p) {
 async function dadosEquipe(req) {
   const u = await exigirEquipe(req);
   const desde = somarDias(agoraLocal().data, -60);
-  const [, , g, salas, fixos, reservas] = await tx([...EXPIRAR, SQL_GERAL, SQL_SALAS, SQL_FIXOS, [
+  const umAno = somarDias(agoraLocal().data, -366);
+  const [, , g, salas, fixos, reservas, parceiros, atendimentos] = await tx([...EXPIRAR, SQL_GERAL, SQL_SALAS, SQL_FIXOS, [
     `SELECT ${COLS_RESERVA}, us.email AS "emailConta"
        FROM reservas r LEFT JOIN usuarios us ON us.id = r.usuario_id
       WHERE r.data >= $1::date ORDER BY r.data, r.horas[1]`, [desde],
+  ], [
+    `SELECT ${COLS_PARCEIRO},
+            CASE WHEN us.id IS NULL THEN 'sem_conta' WHEN us.email_verificado THEN 'verificada'
+                 WHEN p.usuario_confirmado = us.id THEN 'conferida' ELSE 'nao_verificada' END AS conta
+       FROM parceiros p LEFT JOIN usuarios us ON us.email = p.email ORDER BY p.ativo DESC, p.nome`,
+  ], [
+    `SELECT ${COLS_ATENDIMENTO} FROM atendimentos a WHERE a.data >= $1::date OR a.status = 'pendente' ORDER BY a.data DESC, a.criado_em DESC`, [umAno],
   ]]);
-  return [200, { conta: publico(u), agora: agoraLocal(), geral: geralDe(g), salas, fixos, reservas }];
+  return [200, { conta: publico(u), agora: agoraLocal(), geral: geralDe(g), salas, fixos, reservas, parceiros, atendimentos }];
+}
+
+// Valor de uma reserva lançada pela equipe: parceiro opcional e valor ajustado à mão (opcional)
+async function precoEquipe(c, sala, nHoras) {
+  let parceria = null;
+  if (c.parceiro) {
+    const [p] = await q(`SELECT ${COLS_PARCEIRO} FROM parceiros p WHERE p.id = $1`, [texto(c.parceiro, 40)]);
+    if (!p) throw new Falha(400, 'parceiro', 'Parceiro não encontrado.');
+    parceria = p;
+  }
+  const preco = precoDaReserva(sala, nHoras, parceria);
+  if (c.valor !== undefined && c.valor !== null && c.valor !== '') preco.valor = dinheiro(c.valor, 'O valor da reserva');
+  return preco;
 }
 
 function dadosPessoa(c) {
@@ -285,12 +338,14 @@ async function criarReservaEquipe(req, _p, c) {
   const v = await validarPedido({ sala: texto(c.sala, 40), data: texto(c.data, 10), horas: c.horas }, { equipe: true });
   const status = c.status === 'pre' ? 'pre' : 'confirmada';
   const id = randomUUID(), data = texto(c.data, 10);
+  const preco = await precoEquipe(c, v.sala, v.horas.length);
   try {
     await tx([
       ...EXPIRAR,
-      [`INSERT INTO reservas (id, sala, data, horas, nome, especialidade, telefone, status, origem, confirmada_em)
-        VALUES ($1, $2, $3::date, $4::smallint[], $5, $6, $7, $8, 'painel', CASE WHEN $8 = 'confirmada' THEN now() END)`,
-      [id, v.sala.id, data, v.horas, pessoa.nome, pessoa.especialidade, pessoa.telefone, status]],
+      [`INSERT INTO reservas (id, sala, data, horas, nome, especialidade, telefone, status, origem, confirmada_em,
+          valor, valor_cheio, desconto_pct, parceiro_id)
+        VALUES ($1, $2, $3::date, $4::smallint[], $5, $6, $7, $8, 'painel', CASE WHEN $8 = 'confirmada' THEN now() END, $9, $10, $11, $12)`,
+      [id, v.sala.id, data, v.horas, pessoa.nome, pessoa.especialidade, pessoa.telefone, status, preco.valor, preco.valorCheio, preco.descontoPct, preco.parceiroId]],
       [INSERIR_HORAS, [v.sala.id, data, v.horas, id]],
     ]);
   } catch (e) { throw ocupado(e); }
@@ -305,14 +360,16 @@ async function editarReservaEquipe(req, p, c) {
   const v = await validarPedido({ sala: texto(c.sala, 40), data: texto(c.data, 10), horas: c.horas }, { equipe: true });
   const status = c.status === 'pre' ? 'pre' : 'confirmada';
   const data = texto(c.data, 10);
+  const preco = await precoEquipe(c, v.sala, v.horas.length);
   try {
     await tx([
       ['DELETE FROM reserva_horas WHERE reserva_id = $1', [p.id]],
       [`UPDATE reservas SET sala = $2, data = $3::date, horas = $4::smallint[], nome = $5, especialidade = $6, telefone = $7,
           status = $8, expira_em = NULL,
-          confirmada_em = CASE WHEN $8 = 'confirmada' THEN COALESCE(confirmada_em, now()) END
+          confirmada_em = CASE WHEN $8 = 'confirmada' THEN COALESCE(confirmada_em, now()) END,
+          valor = $9, valor_cheio = $10, desconto_pct = $11, parceiro_id = $12
         WHERE id = $1`,
-      [p.id, v.sala.id, data, v.horas, pessoa.nome, pessoa.especialidade, pessoa.telefone, status]],
+      [p.id, v.sala.id, data, v.horas, pessoa.nome, pessoa.especialidade, pessoa.telefone, status, preco.valor, preco.valorCheio, preco.descontoPct, preco.parceiroId]],
       [INSERIR_HORAS, [v.sala.id, data, v.horas, p.id]],
     ]);
   } catch (e) { throw ocupado(e); }
@@ -361,10 +418,9 @@ async function editarSala(req, p, c) {
   if (c.descricao !== undefined) add('descricao', texto(c.descricao, 600));
   if (c.disponivel !== undefined) add('disponivel', !!c.disponivel);
   if (c.ordem !== undefined) add('ordem', Math.trunc(Number(c.ordem)) || 0);
-  if (c.valorHora !== undefined) {
-    const v = c.valorHora === null || c.valorHora === '' ? null : Number(c.valorHora);
-    if (v !== null && (!Number.isFinite(v) || v < 0 || v > 99999)) throw new Falha(400, 'valor', 'Digite o valor só com números, como 45,00.');
-    add('valor_hora', v);
+  if (c.precos !== undefined) {
+    valores.push(JSON.stringify(validarPrecos(c.precos)));
+    campos.push(`precos = $${valores.length}::jsonb`);
   }
   if (!campos.length) return [200, { ok: true }];
   const r = await q(`UPDATE salas SET ${campos.join(', ')} WHERE id = $1 RETURNING id`, valores);
@@ -430,6 +486,146 @@ async function senhaCliente(req, _p, c) {
   return [200, { nome: r[0].nome }];
 }
 
+/* ===== Parceiros (equipe) ===== */
+function dadosParceiro(c, parcial) {
+  const out = {};
+  if (!parcial || c.nome !== undefined) { out.nome = texto(c.nome, 80); if (out.nome.length < 2) throw new Falha(400, 'nome', 'Digite o nome do parceiro.'); }
+  if (!parcial || c.email !== undefined) { out.email = texto(c.email, 120).toLowerCase(); if (!emailOk(out.email)) throw new Falha(400, 'email', 'Digite um e-mail válido.'); }
+  if (!parcial || c.descontoAluguel !== undefined) out.desconto_aluguel = porcentagem(c.descontoAluguel ?? 0, 'O desconto no aluguel');
+  if (!parcial || c.pctAtendimento !== undefined) out.pct_atendimento = porcentagem(c.pctAtendimento ?? 0, 'A porcentagem dos atendimentos');
+  if (c.observacao !== undefined) out.observacao = texto(c.observacao, 400);
+  if (parcial && c.ativo !== undefined) out.ativo = !!c.ativo;
+  return out;
+}
+
+async function criarParceiro(req, _p, c) {
+  await exigirEquipe(req);
+  const d = dadosParceiro(c, false);
+  if (ehEquipe(d.email)) throw new Falha(400, 'email', 'O e-mail da equipe não pode ser parceiro.');
+  const id = novoId('parc-');
+  try {
+    await q('INSERT INTO parceiros (id, email, nome, desconto_aluguel, pct_atendimento, observacao) VALUES ($1, $2, $3, $4, $5, $6)',
+      [id, d.email, d.nome, d.desconto_aluguel, d.pct_atendimento, d.observacao || '']);
+  } catch (e) {
+    if (violouUnico(e)) throw new Falha(409, 'email_existe', 'Já existe um parceiro com este e-mail.');
+    throw e;
+  }
+  return [201, { id }];
+}
+
+async function editarParceiro(req, p, c) {
+  await exigirEquipe(req);
+  const d = dadosParceiro(c, true);
+  if (d.email && ehEquipe(d.email)) throw new Falha(400, 'email', 'O e-mail da equipe não pode ser parceiro.');
+  const campos = [], valores = [p.id];
+  for (const [col, v] of Object.entries(d)) { valores.push(v); campos.push(`${col} = $${valores.length}`); }
+  if (d.email) campos.push('usuario_confirmado = NULL'); // trocou o e-mail: a conferência antiga não vale mais
+  // "É ela mesma": a equipe confere a conta com a pessoa quando o e-mail não foi verificado por código
+  if (c.conferirConta === true) campos.push('usuario_confirmado = (SELECT id FROM usuarios WHERE email = parceiros.email)');
+  if (c.conferirConta === false) campos.push('usuario_confirmado = NULL');
+  if (!campos.length) return [200, { ok: true }];
+  try {
+    const r = await q(`UPDATE parceiros SET ${campos.join(', ')} WHERE id = $1 RETURNING id`, valores);
+    if (!r.length) throw new Falha(404, 'parceiro', 'Parceiro não encontrado.');
+  } catch (e) {
+    if (violouUnico(e)) throw new Falha(409, 'email_existe', 'Já existe um parceiro com este e-mail.');
+    throw e;
+  }
+  return [200, { ok: true }];
+}
+
+async function removerParceiro(req, p) {
+  await exigirEquipe(req);
+  const [n] = await q('SELECT count(*)::int AS n FROM atendimentos WHERE parceiro_id = $1', [p.id]);
+  if (n.n) throw new Falha(409, 'tem_atendimentos', 'Este parceiro tem atendimentos lançados. Desative em vez de apagar, para não perder o histórico.');
+  await q('DELETE FROM parceiros WHERE id = $1', [p.id]);
+  return [200, { ok: true }];
+}
+
+/* ===== Atendimentos dos parceiros: a porcentagem que eles repassam para a Casa ===== */
+async function dadosAtendimento(c, atual) {
+  const parceiroId = texto(c.parceiro ?? (atual && atual.parceiro_id), 40);
+  const [parc] = await q('SELECT id, pct_atendimento::float8 AS pct FROM parceiros WHERE id = $1', [parceiroId]);
+  if (!parc) throw new Falha(400, 'parceiro', 'Escolha o parceiro.');
+  const data = texto(c.data ?? (atual && atual.data), 10);
+  if (!dataValida(data) || data > somarDias(agoraLocal().data, 1)) throw new Falha(400, 'data', 'Escolha o dia do atendimento (hoje ou antes).');
+  const quantidade = Number(c.quantidade ?? (atual && atual.quantidade));
+  if (!Number.isInteger(quantidade) || quantidade < 1 || quantidade > 500) throw new Falha(400, 'quantidade', 'Digite quantos atendimentos foram feitos.');
+  const valorTotal = dinheiro(c.valorTotal ?? (atual && atual.valor_total), 'O valor dos atendimentos');
+  // A porcentagem fica gravada no lançamento: mudar a parceria depois não altera o que já foi lançado
+  const pct = c.pct !== undefined && c.pct !== '' && c.pct !== null ? porcentagem(c.pct, 'A porcentagem') : (atual && !c.parceiro ? Number(atual.pct) : parc.pct);
+  const repasse = Math.round(valorTotal * pct) / 100;
+  let reserva = null;
+  if (c.reserva) {
+    const [r] = await q('SELECT id FROM reservas WHERE id = $1', [texto(c.reserva, 64)]);
+    if (!r) throw new Falha(400, 'reserva', 'Reserva não encontrada.');
+    reserva = r.id;
+  }
+  return { parceiroId: parc.id, data, quantidade, valorTotal, pct, repasse, reserva, observacao: texto(c.observacao ?? (atual && atual.observacao) ?? '', 400) };
+}
+
+async function criarAtendimento(req, _p, c) {
+  await exigirEquipe(req);
+  const a = await dadosAtendimento(c, null);
+  const id = novoId('at-');
+  await q(`INSERT INTO atendimentos (id, parceiro_id, reserva_id, data, quantidade, valor_total, pct, repasse, observacao)
+           VALUES ($1, $2, $3, $4::date, $5, $6, $7, $8, $9)`,
+  [id, a.parceiroId, a.reserva, a.data, a.quantidade, a.valorTotal, a.pct, a.repasse, a.observacao]);
+  return [201, { id, repasse: a.repasse }];
+}
+
+async function editarAtendimento(req, p, c) {
+  await exigirEquipe(req);
+  const [atual] = await q('SELECT parceiro_id, data::text AS data, quantidade, valor_total::float8 AS valor_total, pct::float8 AS pct, observacao FROM atendimentos WHERE id = $1', [p.id]);
+  if (!atual) throw new Falha(404, 'atendimento', 'Lançamento não encontrado.');
+  const so = Object.keys(c).filter((k) => k !== 'status');
+  if (so.length) {
+    const a = await dadosAtendimento(c, atual);
+    await q(`UPDATE atendimentos SET parceiro_id = $2, data = $3::date, quantidade = $4, valor_total = $5, pct = $6, repasse = $7, observacao = $8
+             ${c.reserva !== undefined ? ', reserva_id = $9' : ''} WHERE id = $1`,
+    [p.id, a.parceiroId, a.data, a.quantidade, a.valorTotal, a.pct, a.repasse, a.observacao, ...(c.reserva !== undefined ? [a.reserva] : [])]);
+  }
+  if (c.status !== undefined) {
+    if (!['pendente', 'recebido'].includes(c.status)) throw new Falha(400, 'status', 'Situação inválida.');
+    await q(`UPDATE atendimentos SET status = $2, recebido_em = CASE WHEN $2 = 'recebido' THEN COALESCE(recebido_em, now()) END WHERE id = $1`, [p.id, c.status]);
+  }
+  return [200, { ok: true }];
+}
+
+async function removerAtendimento(req, p) {
+  await exigirEquipe(req);
+  await q('DELETE FROM atendimentos WHERE id = $1', [p.id]);
+  return [200, { ok: true }];
+}
+
+/* ===== Extrato do parceiro (o próprio parceiro vê) ===== */
+async function minhaParceria(req) {
+  const u = await exigirLogin(req);
+  const p = await parceriaDe(u);
+  if (!p) return [200, { parceria: null }];
+  const desde = somarDias(agoraLocal().data, -186);
+  const [reservas, atend] = await tx([
+    [`SELECT r.data::text AS data, r.valor::float8 AS valor FROM reservas r
+       WHERE r.usuario_id = $1 AND r.status = 'confirmada' AND r.data >= $2::date`, [u.id, desde]],
+    [`SELECT ${COLS_ATENDIMENTO} FROM atendimentos a WHERE a.parceiro_id = $1 AND (a.data >= $2::date OR a.status = 'pendente') ORDER BY a.data DESC`, [p.id, desde]],
+  ]);
+  const meses = {};
+  const mes = (k) => (meses[k] ||= { mes: k, aluguel: 0, atendimentos: 0, valorAtendimentos: 0, repasse: 0, repassePendente: 0 });
+  for (const r of reservas) mes(r.data.slice(0, 7)).aluguel += r.valor || 0;
+  for (const a of atend) {
+    const m = mes(a.data.slice(0, 7));
+    m.atendimentos += a.quantidade; m.valorAtendimentos += a.valorTotal; m.repasse += a.repasse;
+    if (a.status === 'pendente') m.repassePendente += a.repasse;
+  }
+  const lista = Object.values(meses).sort((x, y) => (x.mes < y.mes ? 1 : -1))
+    .map((m) => Object.fromEntries(Object.entries(m).map(([k, v]) => [k, typeof v === 'number' ? Math.round(v * 100) / 100 : v])));
+  return [200, {
+    parceria: { nome: p.nome, descontoAluguel: p.descontoAluguel, pctAtendimento: p.pctAtendimento },
+    meses: lista,
+    atendimentos: atend.map(({ parceiroId, reservaId, ...a }) => a),
+  }];
+}
+
 /* ===== Tabela de rotas ===== */
 export const ROTAS = [
   ['GET', '/api/agenda', agenda],
@@ -457,4 +653,11 @@ export const ROTAS = [
   ['DELETE', '/api/admin/fixos/:id', removerFixo],
   ['PUT', '/api/admin/config', salvarConfig],
   ['POST', '/api/admin/usuarios/senha', senhaCliente],
+  ['POST', '/api/admin/parceiros', criarParceiro],
+  ['PATCH', '/api/admin/parceiros/:id', editarParceiro],
+  ['DELETE', '/api/admin/parceiros/:id', removerParceiro],
+  ['POST', '/api/admin/atendimentos', criarAtendimento],
+  ['PATCH', '/api/admin/atendimentos/:id', editarAtendimento],
+  ['DELETE', '/api/admin/atendimentos/:id', removerAtendimento],
+  ['GET', '/api/parceria', minhaParceria],
 ];

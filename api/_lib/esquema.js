@@ -77,6 +77,42 @@ const TABELAS = [
     contagem INT NOT NULL DEFAULT 0,
     janela_ate TIMESTAMPTZ NOT NULL
   )`,
+  // Preços por quantidade de horas, parceiros e atendimentos (repasse de porcentagem)
+  "ALTER TABLE salas ADD COLUMN IF NOT EXISTS precos JSONB NOT NULL DEFAULT '[]'::jsonb",
+  // Passa o antigo "valor por hora" para a tabela uma única vez (depois o campo antigo fica vazio)
+  "UPDATE salas SET precos = jsonb_build_array(jsonb_build_object('horas', 1, 'valor', valor_hora)), valor_hora = NULL WHERE valor_hora IS NOT NULL AND precos = '[]'::jsonb",
+  "UPDATE salas SET valor_hora = NULL WHERE valor_hora IS NOT NULL",
+  'ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS email_verificado BOOLEAN NOT NULL DEFAULT false',
+  `CREATE TABLE IF NOT EXISTS parceiros (
+    id TEXT PRIMARY KEY,
+    email TEXT NOT NULL UNIQUE,
+    nome TEXT NOT NULL,
+    desconto_aluguel NUMERIC(5,2) NOT NULL DEFAULT 0 CHECK (desconto_aluguel BETWEEN 0 AND 100),
+    pct_atendimento NUMERIC(5,2) NOT NULL DEFAULT 0 CHECK (pct_atendimento BETWEEN 0 AND 100),
+    ativo BOOLEAN NOT NULL DEFAULT true,
+    usuario_confirmado TEXT, -- conta que a equipe conferiu com a pessoa (quando o e-mail não foi verificado por código)
+    observacao TEXT NOT NULL DEFAULT '',
+    criado_em TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`,
+  `CREATE TABLE IF NOT EXISTS atendimentos (
+    id TEXT PRIMARY KEY,
+    parceiro_id TEXT NOT NULL REFERENCES parceiros(id) ON DELETE RESTRICT,
+    reserva_id TEXT REFERENCES reservas(id) ON DELETE SET NULL,
+    data DATE NOT NULL,
+    quantidade INT NOT NULL CHECK (quantidade BETWEEN 1 AND 500),
+    valor_total NUMERIC(10,2) NOT NULL CHECK (valor_total >= 0),
+    pct NUMERIC(5,2) NOT NULL CHECK (pct BETWEEN 0 AND 100),
+    repasse NUMERIC(10,2) NOT NULL CHECK (repasse >= 0),
+    status TEXT NOT NULL DEFAULT 'pendente' CHECK (status IN ('pendente', 'recebido')),
+    recebido_em TIMESTAMPTZ,
+    observacao TEXT NOT NULL DEFAULT '',
+    criado_em TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`,
+  'CREATE INDEX IF NOT EXISTS atendimentos_parceiro ON atendimentos (parceiro_id, data)',
+  `ALTER TABLE reservas ADD COLUMN IF NOT EXISTS valor NUMERIC(10,2),
+    ADD COLUMN IF NOT EXISTS valor_cheio NUMERIC(10,2),
+    ADD COLUMN IF NOT EXISTS desconto_pct NUMERIC(5,2),
+    ADD COLUMN IF NOT EXISTS parceiro_id TEXT REFERENCES parceiros(id) ON DELETE SET NULL`,
   `CREATE TABLE IF NOT EXISTS tentativas (
     email TEXT PRIMARY KEY,
     falhas INT NOT NULL DEFAULT 0,

@@ -46,7 +46,8 @@ test('agenda pública com as salas e horários fixos iniciais', async () => {
   assert.deepEqual(dados.salas.map((s) => s.id), ['sala-02', 'sala-04', 'sala-06', 'sala-08', 'safira']);
   assert.equal(dados.salas.find((s) => s.id === 'safira').disponivel, false);
   assert.equal(dados.fixos.length, 4);
-  assert.equal(dados.salas[0].valorHora, undefined, 'valor por hora não aparece no site');
+  assert.deepEqual(dados.salas[0].precos, [], 'sem preço até a equipe cadastrar');
+  assert.equal(dados.parceria, null);
   assert.equal(dados.geral.whatsappAgatha, '5519992487347');
 });
 
@@ -213,12 +214,12 @@ test('equipe confirma pré-reserva que expirou se o horário continua livre', as
 });
 
 test('equipe altera salas, fotos, horários fixos e funcionamento', async () => {
-  let r = await equipe('PATCH', '/api/admin/salas/safira', { disponivel: true, tipo: 'Atendimento', valorHora: 45.5, descricao: 'Sala clara' });
+  let r = await equipe('PATCH', '/api/admin/salas/safira', { disponivel: true, tipo: 'Atendimento', precos: [{ horas: 1, valor: 45.5 }], descricao: 'Sala clara' });
   assert.equal(r.status, 200);
   r = await anonimo('GET', '/api/agenda');
   assert.equal(r.dados.salas.find((s) => s.id === 'safira').disponivel, true);
   r = await equipe('GET', '/api/admin/dados');
-  assert.equal(r.dados.salas.find((s) => s.id === 'safira').valorHora, 45.5);
+  assert.deepEqual(r.dados.salas.find((s) => s.id === 'safira').precos, [{ horas: 1, valor: 45.5 }]);
   const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
   r = await equipe('POST', '/api/admin/salas/safira/foto', { imagem: png });
   assert.equal(r.status, 200);

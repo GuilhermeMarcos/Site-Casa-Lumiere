@@ -102,3 +102,27 @@ Rotas:
 | POST | /api/admin/salas/:id/foto | equipe |
 | POST, DELETE | /api/admin/fixos[/:id] | equipe |
 | PUT | /api/admin/config | equipe |
+
+
+## Sprint 3: preços e parceiros (14/11/2026)
+
+Levantamento com o Guilherme:
+
+| Pergunta | Resposta |
+|---|---|
+| Como o parceiro paga? | Aluguel com desconto e mais uma porcentagem dos atendimentos feitos na sala. |
+| Quem informa os atendimentos? | Só as administradoras, pelo painel. O parceiro vê o extrato. |
+| Como é o preço por quantidade de horas? | As administradoras decidem: no painel elas adicionam a quantidade de horas e o valor. |
+| O valor aparece no site? | Sim, no canto da foto da sala, pequeno, e o total na hora de reservar. |
+
+Backlog:
+
+- [x] Tabela de preços por sala (quantidade de horas e valor), editável no painel
+- [x] Total calculado no servidor pela combinação mais barata da tabela; o navegador só mostra
+- [x] Preços pequenos no canto da foto da sala; total no resumo e na mensagem para a Agatha
+- [x] Parceiros: e-mail, nome, desconto no aluguel (%) e porcentagem dos atendimentos (%)
+- [x] Desconto só vale para conta com e-mail verificado por código ou conferida pela equipe
+- [x] Lançamento de atendimentos com repasse calculado e baixa de "recebido"
+- [x] Extrato mensal para o parceiro em Minhas reservas
+- [x] Reserva pelo painel com parceiro e valor ajustável
+- [x] Testes de cálculo e de fraude (dev/parceiros.mjs)

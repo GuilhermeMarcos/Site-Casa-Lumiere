@@ -73,7 +73,10 @@ test('cliente não entra no painel nem usa nenhuma rota da equipe', async () => 
     ['PATCH', '/api/admin/reservas/abc', {}], ['POST', '/api/admin/reservas/abc/confirmar'], ['DELETE', '/api/admin/reservas/abc'],
     ['POST', '/api/admin/salas'], ['PATCH', '/api/admin/salas/sala-02', { disponivel: false }], ['POST', '/api/admin/salas/sala-02/foto', { imagem: 'x' }],
     ['POST', '/api/admin/fixos', {}], ['DELETE', '/api/admin/fixos/abc'], ['PUT', '/api/admin/config', { abre: 0, fecha: 24 }],
-    ['POST', '/api/admin/usuarios/senha', { email: 'vitima@exemplo.com', senhaNova: 'Invadida-123' }]];
+    ['POST', '/api/admin/usuarios/senha', { email: 'vitima@exemplo.com', senhaNova: 'Invadida-123' }],
+    ['POST', '/api/admin/parceiros', { nome: 'Eu', email: 'atacante@exemplo.com', descontoAluguel: 100, pctAtendimento: 0 }],
+    ['PATCH', '/api/admin/parceiros/abc', { descontoAluguel: 100 }], ['DELETE', '/api/admin/parceiros/abc'],
+    ['POST', '/api/admin/atendimentos', {}], ['PATCH', '/api/admin/atendimentos/abc', { status: 'recebido' }], ['DELETE', '/api/admin/atendimentos/abc']];
   for (const [m, rota, corpo] of rotas) {
     assert.equal((await atacante(m, rota, corpo)).status, 403, `cliente em ${m} ${rota}`);
     assert.equal((await anon(m, rota, corpo)).status, 401, `anônimo em ${m} ${rota}`);
@@ -143,7 +146,6 @@ test('um cliente não vê nem cancela a reserva de outro', async () => {
 test('a agenda pública não mostra nome, telefone nem e-mail de ninguém', async () => {
   const r = await cliente()('GET', '/api/agenda');
   assert.ok(!/Vítima|vitima@|19999990000|telefone|email|nome_|usuario/i.test(JSON.stringify(r.dados.ocupados)));
-  assert.ok(!/valorHora/.test(r.txt), 'valor por hora não aparece');
 });
 
 test('pedido de outro site (CSRF) é recusado', async () => {
