@@ -207,3 +207,36 @@ body{margin:0}
 .chip.exp{background:#EFE7DA;color:var(--muted);box-shadow:inset 0 0 0 1px var(--line)}
 .res .expira,.res .origem{display:inline-block;margin:.4rem 0 0 .5rem;font-size:.75rem;color:var(--muted)}
 .pessoa .link-web{font-size:.75rem;font-weight:600;color:var(--bronze-deep);margin-left:.15rem;white-space:nowrap}
+
+/* Preços por quantidade de horas */
+.numeros{grid-template-columns:repeat(auto-fit, minmax(min(100%, 11rem), 1fr))}
+.precos{border:0;margin:1.25rem 0 0;padding:1rem 1.1rem 1.1rem;border-radius:12px;background:rgba(212,162,78,.07);box-shadow:inset 0 0 0 1px var(--line);display:flex;flex-direction:column;gap:.75rem}
+.precos legend{float:left;width:100%;padding:0;font-family:var(--display);font-size:1.25rem;color:var(--ink)}
+.precos > .ajuda{font-size:.8125rem;color:var(--muted);line-height:1.5}
+.precos-linhas{display:flex;flex-direction:column;gap:.6rem}
+.preco-linha{display:grid;grid-template-columns:6.5rem minmax(0, 12rem) auto;gap:.75rem;align-items:end}
+.preco-linha .campo .rot{font-size:.75rem}
+.precos .btn-borda{align-self:flex-start}
+.precos-ex{font-size:.8125rem;font-weight:600;color:var(--bronze-deep);min-height:1.2em}
+.valor-res{display:inline-block;margin:.4rem 0 0 .5rem;font-size:.8125rem;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
+.valor-res small{font-weight:500;color:var(--muted)}
+
+/* Parceiros */
+.parc{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.75rem 1.25rem;align-items:start;padding:1.1rem 0;border-top:1px solid var(--line)}
+.parc:first-child{border-top:0}
+.parc.off{opacity:.6}
+.parc .sala-nome{font-family:var(--display);font-size:1.35rem;line-height:1.1}
+.parc .pessoa{font-size:.875rem;color:var(--muted);margin-top:.1rem;word-break:break-all}
+.parc .regras{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.55rem}
+.parc .regras span{font-size:.75rem;font-weight:600;padding:.3em .75em;border-radius:999px;background:#fff;box-shadow:inset 0 0 0 1px var(--line);color:var(--ink)}
+.parc .acoes{display:flex;flex-wrap:wrap;gap:.4rem;justify-content:flex-end;align-items:center;max-width:22rem}
+.obs{font-size:.8125rem;color:var(--muted);margin-top:.4rem;font-style:italic}
+.pendente{font-size:.875rem;font-weight:700;color:var(--bronze-deep);margin-top:.4rem}
+.totais{font-size:.875rem;font-weight:600;color:var(--bronze-deep);margin:-.25rem 0 .75rem}
+.res.at .quando span{display:block}
+.calculo{font-family:var(--display);font-size:1.3rem;color:var(--bronze-deep);margin:1rem 0 0;min-height:1.4em}
+@media (max-width: 700px){
+  .parc{grid-template-columns:1fr}
+  .parc .acoes{justify-content:flex-start;max-width:none}
+  .preco-linha{grid-template-columns:5.5rem minmax(0,1fr) auto}
+}

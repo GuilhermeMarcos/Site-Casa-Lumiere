@@ -7,9 +7,10 @@
     reservas: 'M5 5h14v15H5zM5 9h14M9 3v4M15 3v4',
     salas: 'M6 20V10a6 6 0 0 1 12 0v10M4 20h16M14 14v1',
     fixos: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2',
-    funcionamento: 'M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1M15 4v4M9 10v4M17 16v4'
+    funcionamento: 'M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1M15 4v4M9 10v4M17 16v4',
+    parceiros: 'M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM16 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM2 20a6 6 0 0 1 12 0M10 20a6 6 0 0 1 12 0'
   };
-  var SECOES = [['inicio', 'Início'], ['reservas', 'Reservas'], ['salas', 'Salas e valores'], ['fixos', 'Horários fixos'], ['funcionamento', 'Funcionamento']];
+  var SECOES = [['inicio', 'Início'], ['reservas', 'Reservas'], ['salas', 'Salas e valores'], ['parceiros', 'Parceiros'], ['fixos', 'Horários fixos'], ['funcionamento', 'Funcionamento']];
   var DIAS_SEM = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
   var d = document, $ = function(id){ return d.getElementById(id); };
   function el(tag, cls, txt){ var e = d.createElement(tag); if(cls) e.className = cls; if(txt != null) e.textContent = txt; return e; }
@@ -23,11 +24,23 @@
   function cap(s){ return s.charAt(0).toUpperCase() + s.slice(1); }
   function diaCurto(k){ var dt = deChave(k); return cap(limpa(fmtDia.format(dt))) + (dt.getFullYear() !== hoje.getFullYear() ? ' de ' + dt.getFullYear() : ''); }
   function diaLongo(k){ return cap(limpa(fmtLongo.format(deChave(k)))); }
+  var fmtBRL = new Intl.NumberFormat('pt-BR', {style:'currency', currency:'BRL'});
+  function brl(v){ return v == null ? '' : fmtBRL.format(v); }
+  /* "1.234,56" ou "1234.56" vira número; vazio vira null */
+  function numero(txt){ var t = String(txt == null ? '' : txt).trim().replace(/[R$\s]/g, ''); if(t === '') return null; if(t.indexOf(',') >= 0) t = t.replace(/\./g, '').replace(',', '.'); var n = Number(t); return isFinite(n) ? n : NaN; }
+  function emReais(v){ return v == null ? '' : String(Math.round(v * 100) / 100).replace('.', ','); }
+  /* Mesmo cálculo do servidor: a combinação mais barata das linhas da tabela que soma as horas */
+  function calcularValor(precos, n){
+    if(!precos || !precos.length || !(n > 0)) return null;
+    var m = [0]; for(var i = 1; i <= n; i++){ m[i] = Infinity; precos.forEach(function(p){ if(p.horas <= i && m[i - p.horas] + Math.round(p.valor * 100) < m[i]) m[i] = m[i - p.horas] + Math.round(p.valor * 100); }); }
+    return isFinite(m[n]) ? m[n] / 100 : null;
+  }
+  function comDesconto(v, pct){ return v == null ? null : Math.round(Math.round(v * 100) * (100 - (pct || 0)) / 100) / 100; }
   function faixa(horas){ horas = (horas || []).slice().sort(function(a,b){return a-b;}); if(!horas.length) return ''; var out = [], i0 = horas[0], f = horas[0];
     for(var i = 1; i <= horas.length; i++){ if(horas[i] === f + 1) f = horas[i]; else { out.push(i0 + 'h às ' + (f + 1) + 'h'); i0 = f = horas[i]; } } return out.join(', '); }
 
   /* ===== Estado ===== */
-  var st = { aba: 'inicio', filtro: 'todas', filtroSala: '', geral: null, salas: [], fixos: [], reservas: [], carregado: false, acesso: null, nome: '' };
+  var st = { aba: 'inicio', filtro: 'todas', filtroSala: '', geral: null, salas: [], fixos: [], reservas: [], parceiros: [], atendimentos: [], filtroMes: '', filtroParc: '', carregado: false, acesso: null, nome: '' };
 
   function api(metodo, caminho, corpo){
     return fetch(caminho, {
@@ -122,7 +135,7 @@
     if(st.aba === 'inicio'){ titulo.innerHTML = 'Olá, <em></em>'; titulo.querySelector('em').textContent = nomeCurto || 'equipe'; sub.textContent = 'Hoje é ' + limpa(fmtLongo.format(hoje)) + '.'; }
     else { titulo.textContent = SECOES.filter(function(s){ return s[0] === st.aba; })[0][1]; sub.textContent = {reservas:'Confirme pré-reservas, crie e altere reservas.', salas:'Nome, tipo, foto, valor por hora e disponibilidade de cada sala.', fixos:'Horários que já ficam reservados e se repetem.', funcionamento:'Horário de abertura, dias e contato que recebe as pré-reservas.'}[st.aba]; }
     var s = el('div', 'secao'); s.setAttribute('role', 'tabpanel'); s.setAttribute('aria-labelledby', 'tab-' + st.aba);
-    ({inicio: telaInicio, reservas: telaReservas, salas: telaSalas, fixos: telaFixos, funcionamento: telaFuncionamento})[st.aba](s);
+    ({inicio: telaInicio, reservas: telaReservas, salas: telaSalas, parceiros: telaParceiros, fixos: telaFixos, funcionamento: telaFuncionamento})[st.aba](s);
     area.appendChild(s);
   }
   function semAcesso(){
@@ -168,7 +181,7 @@
     [[pre.length, pre.length === 1 ? 'Pré-reserva para confirmar' : 'Pré-reservas para confirmar', 'reservas', true, 'pre'],
      [hojeRes.length, hojeRes.length === 1 ? 'Reserva hoje' : 'Reservas hoje', 'reservas', false, 'todas'],
      [horasSemana + 'h', 'Reservadas nos próximos 7 dias', 'reservas', false, 'todas'],
-     [ativas + ' de ' + st.salas.length, 'Salas disponíveis', 'salas', false]].forEach(function(n){
+     [ativas + ' de ' + st.salas.length, 'Salas disponíveis', 'salas', false]].concat(st.parceiros.length ? [[brl(aReceber()), 'A receber dos parceiros', 'parceiros', false]] : []).forEach(function(n){
       var b = el('button', 'numero' + (n[3] ? ' destaque' : '')); b.type = 'button';
       b.appendChild(el('strong', null, n[0])); b.appendChild(el('span', null, n[1]));
       b.addEventListener('click', function(){ if(n[4]) st.filtro = n[4]; ir(n[2]); });
@@ -207,6 +220,9 @@
       var chip = el('span', 'chip ' + ({confirmada:'ok', pre:'pre', expirada:'exp'})[r.status], ({confirmada:'Reservada', pre:'Pré-reserva', expirada:'Pré-reserva expirou'})[r.status]); meio.appendChild(chip);
       if(r.status === 'pre' && r.expiraEm){ meio.appendChild(el('span', 'expira', 'Vale até ' + fmtHora.format(new Date(r.expiraEm)))); }
       if(r.origem === 'painel') meio.appendChild(el('span', 'origem', 'Feita pelo painel'));
+      var vl = el('span', 'valor-res', r.valor != null ? brl(r.valor) : 'Valor a combinar');
+      if(r.parceiroId){ var pc = parceiroPorId(r.parceiroId); vl.appendChild(el('small', null, ' parceiro' + (pc ? ' ' + pc.nome.split(' ')[0] : '') + (r.descontoPct ? ', ' + String(r.descontoPct).replace('.', ',') + '% de desconto' : ''))); }
+      meio.appendChild(vl);
       li.appendChild(meio);
       var ac = el('div', 'acoes');
       if(r.status !== 'confirmada'){
@@ -289,6 +305,21 @@
       cs.appendChild(campo('Especialidade', entrada('r-esp', 'text', r ? r.especialidade : '')));
       cs.appendChild(campo('WhatsApp', entrada('r-tel', 'tel', r ? r.telefone : '', {inputmode:'tel'})));
       cs.appendChild(campo('Situação', seletor('r-status', [['confirmada', 'Reservada'], ['pre', 'Pré-reserva']], r ? (r.status === 'confirmada' ? 'confirmada' : 'pre') : 'confirmada')));
+      var opsParc = [['', 'Não é parceiro']].concat(st.parceiros.filter(function(p){ return p.ativo || (r && r.parceiroId === p.id); }).map(function(p){ return [p.id, p.nome + ' (' + String(p.descontoAluguel).replace('.', ',') + '% de desconto)']; }));
+      cs.appendChild(campo('Parceiro', seletor('r-parc', opsParc, r ? (r.parceiroId || '') : '')));
+      var iVal = entrada('r-valor', 'text', '', {inputmode:'decimal', placeholder:'0,00'});
+      var pv = el('div', 'prefixo'); pv.appendChild(el('span', null, 'R$')); pv.appendChild(iVal);
+      var cVal = el('div', 'campo'); var lVal = el('label', null, 'Valor do aluguel'); lVal.htmlFor = 'r-valor'; cVal.appendChild(lVal); cVal.appendChild(pv);
+      var ajudaVal = el('span', 'ajuda'); cVal.appendChild(ajudaVal); cs.appendChild(cVal);
+      function valorAuto(){
+        var sala = salaPorId($('r-sala').value), n = (+$('r-ate').value) - (+$('r-de').value), pc = parceiroPorId($('r-parc').value);
+        var cheio = sala ? calcularValor(sala.precos, n) : null;
+        return pc ? comDesconto(cheio, pc.descontoAluguel) : cheio;
+      }
+      function mostrarAuto(){ var v = valorAuto(); ajudaVal.textContent = 'Em branco: ' + (v != null ? brl(v) + ' pela tabela da sala' : 'a tabela da sala não tem preço para essas horas') + '.'; }
+      if(r && r.valor != null && r.valor !== valorAuto()) iVal.value = emReais(r.valor);
+      ['r-sala', 'r-de', 'r-ate', 'r-parc'].forEach(function(id){ cs.querySelector('#' + id).addEventListener('change', mostrarAuto); });
+      setTimeout(mostrarAuto, 0);
       f.appendChild(cs);
       var rod = el('div', 'rodape-form'); var msg = el('p', 'msg'); msg.setAttribute('role', 'alert'); rod.appendChild(msg);
       var cancelar = el('button', 'btn-borda', 'Cancelar'); cancelar.type = 'button'; cancelar.addEventListener('click', fechar); rod.appendChild(cancelar);
@@ -302,7 +333,9 @@
         if(!nome){ msg.textContent = 'Digite o nome de quem vai usar a sala.'; return; }
         var horas = []; for(var h = de; h < ate; h++) horas.push(h);
         var c = conflito(sala, dia, horas, r && r.id); if(c){ msg.textContent = 'Esse horário não está livre: ' + c + '.'; return; }
-        var dados = { sala: sala, data: dia, horas: horas, nome: nome, especialidade: $('r-esp').value.trim(), telefone: $('r-tel').value.trim(), status: $('r-status').value };
+        var vManual = numero($('r-valor').value);
+        if(vManual !== null && (isNaN(vManual) || vManual < 0)){ msg.textContent = 'Digite o valor só com números, como 150,00.'; return; }
+        var dados = { sala: sala, data: dia, horas: horas, nome: nome, especialidade: $('r-esp').value.trim(), telefone: $('r-tel').value.trim(), status: $('r-status').value, parceiro: $('r-parc').value, valor: vManual === null ? '' : vManual };
         salvar.disabled = true;
         escrever('form-reserva', function(){ return r ? api('PATCH', '/api/admin/reservas/' + r.id, dados) : api('POST', '/api/admin/reservas', dados); }).then(function(ok){
           salvar.disabled = false;
@@ -350,25 +383,267 @@
     cab.appendChild(ch); corpo.appendChild(cab);
     var f = el('form'); f.noValidate = true; var cs = el('div', 'campos');
     var iNome = entrada('n-' + x.id, 'text', x.nome || ''), iTipo = entrada('t-' + x.id, 'text', x.tipo || '', {placeholder:'Ex.: Psicologia'});
-    var iValor = entrada('v-' + x.id, 'text', x.valorHora != null ? String(x.valorHora).replace('.', ',') : '', {inputmode:'decimal', placeholder:'0,00'});
-    var pre = el('div', 'prefixo'); pre.appendChild(el('span', null, 'R$')); pre.appendChild(iValor);
     var iDesc = el('textarea'); iDesc.id = 'd-' + x.id; iDesc.rows = 2; iDesc.placeholder = 'Como a sala é equipada'; iDesc.value = x.descricao || '';
     cs.appendChild(campo('Nome', iNome)); cs.appendChild(campo('Tipo de sala', iTipo));
-    var cv = el('div', 'campo'); var lv = el('label', null, 'Valor por hora'); lv.htmlFor = iValor.id; cv.appendChild(lv); cv.appendChild(pre); cv.appendChild(el('span', 'ajuda', 'Só para a equipe. O valor é combinado no WhatsApp.')); cs.appendChild(cv);
     cs.appendChild(campo('Descrição', iDesc, 'largo'));
     f.appendChild(cs);
+    var tabela = tabelaPrecos(x);
+    f.appendChild(tabela.el);
     var rod = el('div', 'rodape-form'); var msg = el('p', 'msg'); rod.appendChild(msg); var salvo = el('span', 'salvo'); salvo.setAttribute('role', 'status'); rod.appendChild(salvo);
     var bt = el('button', 'btn', 'Salvar sala'); bt.type = 'submit'; rod.appendChild(bt); f.appendChild(rod);
     f.addEventListener('submit', function(e){
       e.preventDefault(); msg.textContent = ''; salvo.textContent = '';
-      var v = iValor.value.trim().replace(/\./g, '').replace(',', '.'); var num = v === '' ? null : Number(v);
-      if(v !== '' && (isNaN(num) || num < 0)){ msg.textContent = 'Digite o valor só com números, como 45,00.'; return; }
       if(!iNome.value.trim()){ msg.textContent = 'A sala precisa de um nome.'; return; }
+      var precos = tabela.ler(); if(typeof precos === 'string'){ msg.textContent = precos; return; }
       bt.disabled = true;
-      escrever('s' + x.id, function(){ return api('PATCH', '/api/admin/salas/' + x.id, {nome: iNome.value.trim(), tipo: iTipo.value.trim(), valorHora: num, descricao: iDesc.value.trim()}); }).then(function(ok){ bt.disabled = false; if(ok) toast(nomeSala(x.id) + ': dados salvos.'); });
+      escrever('s' + x.id, function(){ return api('PATCH', '/api/admin/salas/' + x.id, {nome: iNome.value.trim(), tipo: iTipo.value.trim(), precos: precos, descricao: iDesc.value.trim()}); }).then(function(ok){ bt.disabled = false; if(ok) toast(nomeSala(x.id) + ': dados e preços salvos.'); });
     });
     corpo.appendChild(f); art.appendChild(corpo);
     return art;
+  }
+
+  /* Tabela de preços da sala: cada linha é "quantidade de horas → valor" */
+  function tabelaPrecos(x){
+    var caixa = el('fieldset', 'precos');
+    var leg = el('legend', null, 'Preços do aluguel'); caixa.appendChild(leg);
+    caixa.appendChild(el('p', 'ajuda', 'Coloque quanto custa cada quantidade de horas. Ex.: 1 hora R$ 50, 4 horas R$ 180. Para um total que não está na lista, o site soma a combinação mais barata.'));
+    var linhas = el('div', 'precos-linhas'); caixa.appendChild(linhas);
+    var exemplo = el('p', 'precos-ex'); exemplo.setAttribute('aria-live', 'polite');
+    var n = 0;
+    function linha(horas, valor){
+      n++;
+      var l = el('div', 'preco-linha');
+      var ih = entrada('ph-' + x.id + '-' + n, 'number', horas != null ? horas : '', {min:'1', max:'24', step:'1', inputmode:'numeric', 'aria-label':'Quantidade de horas'});
+      var iv = entrada('pv-' + x.id + '-' + n, 'text', valor != null ? emReais(valor) : '', {inputmode:'decimal', placeholder:'0,00', 'aria-label':'Valor'});
+      var ch = el('div', 'campo'); ch.appendChild(el('span', 'rot', 'Horas')); ch.appendChild(ih);
+      var pv = el('div', 'prefixo'); pv.appendChild(el('span', null, 'R$')); pv.appendChild(iv);
+      var cv = el('div', 'campo'); cv.appendChild(el('span', 'rot', 'Valor')); cv.appendChild(pv);
+      var x2 = el('button', 'btn-texto perigo', 'Tirar'); x2.type = 'button'; x2.setAttribute('aria-label', 'Tirar esta linha');
+      x2.addEventListener('click', function(){ l.remove(); atualizarEx(); });
+      [ih, iv].forEach(function(i){ i.addEventListener('input', atualizarEx); });
+      l.appendChild(ch); l.appendChild(cv); l.appendChild(x2); linhas.appendChild(l);
+    }
+    (x.precos || []).forEach(function(p){ linha(p.horas, p.valor); });
+    if(!(x.precos || []).length) linha(1, null);
+    var add = el('button', 'btn-borda', 'Adicionar quantidade de horas'); add.type = 'button';
+    add.addEventListener('click', function(){ linha(null, null); linhas.lastChild.querySelector('input').focus(); });
+    caixa.appendChild(add); caixa.appendChild(exemplo);
+    function ler(){
+      var out = [], vistas = {};
+      var ls = linhas.querySelectorAll('.preco-linha');
+      for(var i = 0; i < ls.length; i++){
+        var ins = ls[i].querySelectorAll('input'), h = ins[0].value.trim(), v = numero(ins[1].value);
+        if(h === '' && v === null) continue;
+        h = Number(h);
+        if(!(h >= 1 && h <= 24 && Math.floor(h) === h)) return 'A quantidade de horas vai de 1 a 24.';
+        if(v === null || isNaN(v) || v < 0) return 'Digite o valor de ' + h + 'h só com números, como 50,00.';
+        if(vistas[h]) return 'A quantidade de ' + h + 'h está repetida.';
+        vistas[h] = 1; out.push({horas: h, valor: v});
+      }
+      return out.sort(function(a, b){ return a.horas - b.horas; });
+    }
+    function atualizarEx(){
+      var p = ler(); if(typeof p === 'string' || !p.length){ exemplo.textContent = ''; return; }
+      var ex = [1, 2, 4, 6, 8].map(function(h){ var v = calcularValor(p, h); return v != null ? h + 'h ' + brl(v) : null; }).filter(Boolean);
+      exemplo.textContent = ex.length ? 'No site: ' + ex.join(' · ') : '';
+    }
+    atualizarEx();
+    return { el: caixa, ler: ler };
+  }
+
+  /* ===== Parceiros: desconto no aluguel e porcentagem dos atendimentos ===== */
+  function parceiroPorId(id){ return st.parceiros.filter(function(p){ return p.id === id; })[0]; }
+  function pctTxt(v){ return String(v).replace('.', ',') + '%'; }
+  function aReceber(){ return st.atendimentos.filter(function(a){ return a.status === 'pendente'; }).reduce(function(t, a){ return t + a.repasse; }, 0); }
+  var fmtMes = new Intl.DateTimeFormat('pt-BR', {month:'long', year:'numeric'});
+  function nomeMes(m){ return cap(fmtMes.format(deChave(m + '-01'))); }
+  var CONTA = {
+    verificada: ['ok', 'Conta verificada pelo e-mail'],
+    conferida: ['ok', 'Conta conferida pela equipe'],
+    nao_verificada: ['pre', 'Conta sem verificação: o desconto ainda não vale'],
+    sem_conta: ['exp', 'Ainda não criou conta no site']
+  };
+  function telaParceiros(s){
+    var mesAtual = HOJE.slice(0, 7);
+    var nums = el('div', 'numeros');
+    var doMes = st.atendimentos.filter(function(a){ return a.data.slice(0, 7) === mesAtual; });
+    [[brl(aReceber()), 'A receber (pendente)', true],
+     [brl(doMes.reduce(function(t, a){ return t + a.repasse; }, 0)), 'Repasse de ' + nomeMes(mesAtual).toLowerCase(), false],
+     [doMes.reduce(function(t, a){ return t + a.quantidade; }, 0), 'Atendimentos lançados no mês', false],
+     [st.parceiros.filter(function(p){ return p.ativo; }).length, 'Parceiros ativos', false]].forEach(function(n){
+      var b = el('div', 'numero' + (n[2] ? ' destaque' : '')); b.appendChild(el('strong', null, n[0])); b.appendChild(el('span', null, n[1])); nums.appendChild(b);
+    });
+    s.appendChild(nums);
+
+    var b = bloco('Parceiros', 'Pagam o aluguel com desconto e repassam uma porcentagem dos atendimentos feitos na sala');
+    var novo = el('button', 'btn', 'Novo parceiro'); novo.type = 'button'; novo.addEventListener('click', function(){ formParceiro(null); });
+    b.querySelector('.bloco-cab').appendChild(novo);
+    if(!st.parceiros.length) b.appendChild(vazio('Nenhum parceiro ainda', 'Cadastre o e-mail e o nome da pessoa, o desconto no aluguel e a porcentagem dos atendimentos. O desconto vale quando ela reservar com a conta desse e-mail.'));
+    var ul = el('ul', 'lista');
+    st.parceiros.forEach(function(p){
+      var li = el('li', 'parc' + (p.ativo ? '' : ' off'));
+      var meio = el('div');
+      meio.appendChild(el('div', 'sala-nome', p.nome));
+      meio.appendChild(el('div', 'pessoa', p.email));
+      var regras = el('div', 'regras');
+      regras.appendChild(el('span', null, pctTxt(p.descontoAluguel) + ' de desconto no aluguel'));
+      regras.appendChild(el('span', null, pctTxt(p.pctAtendimento) + ' dos atendimentos para a Casa'));
+      meio.appendChild(regras);
+      var cc = CONTA[p.conta] || CONTA.sem_conta; meio.appendChild(el('span', 'chip ' + cc[0], p.ativo ? cc[1] : 'Parceria desativada'));
+      if(p.observacao) meio.appendChild(el('p', 'obs', p.observacao));
+      var pend = st.atendimentos.filter(function(a){ return a.parceiroId === p.id && a.status === 'pendente'; }).reduce(function(t, a){ return t + a.repasse; }, 0);
+      if(pend) meio.appendChild(el('p', 'pendente', 'A receber: ' + brl(pend)));
+      li.appendChild(meio);
+      var ac = el('div', 'acoes');
+      if(p.ativo){ var la = el('button', 'btn', 'Lançar atendimentos'); la.type = 'button'; la.addEventListener('click', function(){ formAtendimento(null, p.id); }); ac.appendChild(la); }
+      if(p.ativo && p.conta === 'nao_verificada'){
+        var cf = el('button', 'btn-borda', 'É ela mesma: liberar desconto'); cf.type = 'button';
+        cf.title = 'Use depois de confirmar com a pessoa que a conta com este e-mail é dela';
+        cf.addEventListener('click', function(){ escrever('p' + p.id, function(){ return api('PATCH', '/api/admin/parceiros/' + p.id, {conferirConta: true}); }).then(function(ok){ if(ok) toast('Conta de ' + p.nome + ' conferida. O desconto já vale.'); }); });
+        ac.appendChild(cf);
+      }
+      var ed = el('button', 'btn-texto', 'Editar'); ed.type = 'button'; ed.addEventListener('click', function(){ formParceiro(p); }); ac.appendChild(ed);
+      var at = el('button', 'btn-texto', p.ativo ? 'Desativar' : 'Ativar'); at.type = 'button';
+      at.addEventListener('click', function(){ escrever('p' + p.id, function(){ return api('PATCH', '/api/admin/parceiros/' + p.id, {ativo: !p.ativo}); }).then(function(ok){ if(ok) toast(p.ativo ? 'Parceria de ' + p.nome + ' desativada. Ela volta a pagar o preço normal.' : 'Parceria de ' + p.nome + ' ativada.'); }); });
+      ac.appendChild(at);
+      if(!st.atendimentos.some(function(a){ return a.parceiroId === p.id; })){
+        var rm = el('button', 'btn-texto perigo', 'Apagar'); rm.type = 'button';
+        rm.addEventListener('click', function(){
+          if(!rm.dataset.ok){ rm.dataset.ok = '1'; rm.textContent = 'Confirmar'; setTimeout(function(){ if(rm.isConnected){ delete rm.dataset.ok; rm.textContent = 'Apagar'; } }, 5000); return; }
+          escrever('p' + p.id, function(){ return api('DELETE', '/api/admin/parceiros/' + p.id); }).then(function(ok){ if(ok) toast('Parceiro apagado.'); });
+        });
+        ac.appendChild(rm);
+      }
+      li.appendChild(ac); ul.appendChild(li);
+    });
+    if(st.parceiros.length) b.appendChild(ul);
+    s.appendChild(b);
+
+    /* Lançamentos */
+    var b2 = bloco('Atendimentos e repasses', 'O valor do repasse é calculado sozinho pela porcentagem do parceiro');
+    if(st.parceiros.some(function(p){ return p.ativo; })){ var la2 = el('button', 'btn-borda', 'Lançar atendimentos'); la2.type = 'button'; la2.addEventListener('click', function(){ formAtendimento(null, ''); }); b2.querySelector('.bloco-cab').appendChild(la2); }
+    var meses = []; st.atendimentos.forEach(function(a){ var m = a.data.slice(0, 7); if(meses.indexOf(m) < 0) meses.push(m); });
+    if(meses.indexOf(mesAtual) < 0) meses.unshift(mesAtual);
+    meses.sort().reverse();
+    var f = el('div', 'filtros');
+    var cm = el('div', 'campo'); var lm = el('label', null, 'Mês'); lm.htmlFor = 'filtro-mes';
+    var sm = seletor('filtro-mes', [['', 'Todos os pendentes']].concat(meses.map(function(m){ return [m, nomeMes(m)]; })), st.filtroMes);
+    sm.addEventListener('change', function(){ st.filtroMes = sm.value; desenhar(); }); cm.appendChild(lm); cm.appendChild(sm); f.appendChild(cm);
+    var cp = el('div', 'campo'); var lp = el('label', null, 'Parceiro'); lp.htmlFor = 'filtro-parc';
+    var sp = seletor('filtro-parc', [['', 'Todos']].concat(st.parceiros.map(function(p){ return [p.id, p.nome]; })), st.filtroParc);
+    sp.addEventListener('change', function(){ st.filtroParc = sp.value; desenhar(); }); cp.appendChild(lp); cp.appendChild(sp); f.appendChild(cp);
+    b2.appendChild(f);
+    var lista = st.atendimentos.filter(function(a){
+      if(st.filtroParc && a.parceiroId !== st.filtroParc) return false;
+      return st.filtroMes ? a.data.slice(0, 7) === st.filtroMes : a.status === 'pendente';
+    });
+    if(lista.length){
+      var tot = lista.reduce(function(t, a){ t.q += a.quantidade; t.v += a.valorTotal; t.r += a.repasse; if(a.status === 'pendente') t.p += a.repasse; return t; }, {q:0, v:0, r:0, p:0});
+      b2.appendChild(el('p', 'totais', tot.q + ' atendimentos · ' + brl(tot.v) + ' atendidos · repasse ' + brl(tot.r) + (tot.p ? ' · falta receber ' + brl(tot.p) : ' · tudo recebido')));
+      var ul2 = el('ul', 'lista');
+      lista.forEach(function(a){
+        var p = parceiroPorId(a.parceiroId) || {nome: 'Parceiro removido'};
+        var li = el('li', 'res at');
+        var q = el('div', 'quando'); q.appendChild(el('strong', null, diaCurto(a.data))); q.appendChild(el('span', null, a.quantidade + (a.quantidade === 1 ? ' atendimento' : ' atendimentos'))); li.appendChild(q);
+        var meio = el('div'); meio.appendChild(el('div', 'sala-nome', p.nome));
+        meio.appendChild(el('div', 'pessoa', brl(a.valorTotal) + ' em atendimentos × ' + pctTxt(a.pct) + ' = repasse de ' + brl(a.repasse)));
+        if(a.observacao) meio.appendChild(el('p', 'obs', a.observacao));
+        meio.appendChild(el('span', 'chip ' + (a.status === 'recebido' ? 'ok' : 'pre'), a.status === 'recebido' ? 'Recebido' : 'A receber'));
+        li.appendChild(meio);
+        var ac = el('div', 'acoes');
+        var tg = el('button', a.status === 'recebido' ? 'btn-texto' : 'btn', a.status === 'recebido' ? 'Voltar para a receber' : 'Marcar recebido'); tg.type = 'button';
+        tg.addEventListener('click', function(){ tg.disabled = true; escrever('a' + a.id, function(){ return api('PATCH', '/api/admin/atendimentos/' + a.id, {status: a.status === 'recebido' ? 'pendente' : 'recebido'}); }).then(function(ok){ if(ok) toast(a.status === 'recebido' ? 'Voltou para a receber.' : 'Repasse de ' + brl(a.repasse) + ' marcado como recebido.'); else tg.disabled = false; }); });
+        ac.appendChild(tg);
+        var ed = el('button', 'btn-texto', 'Editar'); ed.type = 'button'; ed.addEventListener('click', function(){ formAtendimento(a, a.parceiroId); }); ac.appendChild(ed);
+        var rm = el('button', 'btn-texto perigo', 'Apagar'); rm.type = 'button';
+        rm.addEventListener('click', function(){
+          if(!rm.dataset.ok){ rm.dataset.ok = '1'; rm.textContent = 'Confirmar'; setTimeout(function(){ if(rm.isConnected){ delete rm.dataset.ok; rm.textContent = 'Apagar'; } }, 5000); return; }
+          escrever('a' + a.id, function(){ return api('DELETE', '/api/admin/atendimentos/' + a.id); }).then(function(ok){ if(ok) toast('Lançamento apagado.'); });
+        });
+        ac.appendChild(rm); li.appendChild(ac); ul2.appendChild(li);
+      });
+      b2.appendChild(ul2);
+    } else {
+      b2.appendChild(vazio(st.filtroMes ? 'Nada lançado nesse mês' : 'Nenhum repasse pendente', 'Depois que o parceiro usar a sala, lance quantos atendimentos fez e quanto cobrou. O sistema calcula a parte da Casa.'));
+    }
+    s.appendChild(b2);
+  }
+
+  function formParceiro(p){
+    abrirJanela(p ? 'Editar parceiro' : 'Novo parceiro', function(j, fechar){
+      var f = el('form'); f.noValidate = true; var cs = el('div', 'campos');
+      cs.appendChild(campo('Nome', entrada('pa-nome', 'text', p ? p.nome : '', {autocomplete:'off'})));
+      cs.appendChild(campo('E-mail da conta no site', entrada('pa-email', 'email', p ? p.email : '', {autocomplete:'off', inputmode:'email'}), null, 'O desconto vale quando ela reservar com a conta deste e-mail.'));
+      var d1 = entrada('pa-desc', 'text', p ? emReais(p.descontoAluguel) : '', {inputmode:'decimal', placeholder:'Ex.: 30'});
+      var d2 = entrada('pa-pct', 'text', p ? emReais(p.pctAtendimento) : '', {inputmode:'decimal', placeholder:'Ex.: 20'});
+      cs.appendChild(campo('Desconto no aluguel (%)', d1)); cs.appendChild(campo('Porcentagem dos atendimentos (%)', d2));
+      var ob = el('textarea'); ob.id = 'pa-obs'; ob.rows = 2; ob.placeholder = 'Ex.: Fisioterapeuta, paga até o dia 5'; ob.value = p ? p.observacao : '';
+      cs.appendChild(campo('Observação (só a equipe vê)', ob, 'largo'));
+      f.appendChild(cs);
+      var rod = el('div', 'rodape-form'); var msg = el('p', 'msg'); msg.setAttribute('role', 'alert'); rod.appendChild(msg);
+      var cancelar = el('button', 'btn-borda', 'Cancelar'); cancelar.type = 'button'; cancelar.addEventListener('click', fechar); rod.appendChild(cancelar);
+      var salvar = el('button', 'btn', p ? 'Salvar' : 'Cadastrar parceiro'); salvar.type = 'submit'; rod.appendChild(salvar); f.appendChild(rod);
+      f.addEventListener('submit', function(e){
+        e.preventDefault(); msg.textContent = '';
+        var dados = { nome: $('pa-nome').value.trim(), email: $('pa-email').value.trim(), descontoAluguel: numero(d1.value), pctAtendimento: numero(d2.value), observacao: ob.value.trim() };
+        if(dados.nome.length < 2){ msg.textContent = 'Digite o nome.'; return; }
+        if(!/\S+@\S+\.\S+/.test(dados.email)){ msg.textContent = 'Digite o e-mail da conta da pessoa.'; return; }
+        if(dados.descontoAluguel === null) dados.descontoAluguel = 0; if(dados.pctAtendimento === null) dados.pctAtendimento = 0;
+        if(isNaN(dados.descontoAluguel) || dados.descontoAluguel < 0 || dados.descontoAluguel > 100 || isNaN(dados.pctAtendimento) || dados.pctAtendimento < 0 || dados.pctAtendimento > 100){ msg.textContent = 'As porcentagens vão de 0 a 100.'; return; }
+        salvar.disabled = true;
+        escrever('form-parceiro', function(){ return p ? api('PATCH', '/api/admin/parceiros/' + p.id, dados) : api('POST', '/api/admin/parceiros', dados); }).then(function(ok){
+          salvar.disabled = false; if(ok){ fechar(); toast(p ? 'Parceiro atualizado.' : dados.nome + ' agora é parceiro da Casa.'); }
+        });
+      });
+      j.appendChild(f);
+    });
+  }
+
+  function formAtendimento(a, parceiroId){
+    abrirJanela(a ? 'Editar lançamento' : 'Lançar atendimentos', function(j, fechar){
+      var f = el('form'); f.noValidate = true; var cs = el('div', 'campos');
+      var ops = st.parceiros.filter(function(p){ return p.ativo || p.id === parceiroId; }).map(function(p){ return [p.id, p.nome]; });
+      var sp = seletor('at-parc', ops, parceiroId || (ops[0] && ops[0][0]));
+      cs.appendChild(campo('Parceiro', sp, 'largo'));
+      cs.appendChild(campo('Dia', entrada('at-dia', 'date', a ? a.data : HOJE, {max: HOJE})));
+      var iq = entrada('at-qtd', 'number', a ? a.quantidade : '', {min:'1', max:'500', step:'1', inputmode:'numeric', placeholder:'Ex.: 5'});
+      cs.appendChild(campo('Quantos atendimentos', iq));
+      var iv = entrada('at-valor', 'text', a ? emReais(a.valorTotal) : '', {inputmode:'decimal', placeholder:'0,00'});
+      var pv = el('div', 'prefixo'); pv.appendChild(el('span', null, 'R$')); pv.appendChild(iv);
+      var cv = el('div', 'campo'); var lv = el('label', null, 'Valor total cobrado'); lv.htmlFor = 'at-valor'; cv.appendChild(lv); cv.appendChild(pv); cv.appendChild(el('span', 'ajuda', 'Soma do que o parceiro cobrou nesses atendimentos'));
+      cs.appendChild(cv);
+      var ip = entrada('at-pct', 'text', a ? emReais(a.pct) : '', {inputmode:'decimal'});
+      cs.appendChild(campo('Porcentagem para a Casa (%)', ip));
+      var ob = el('textarea'); ob.id = 'at-obs'; ob.rows = 2; ob.value = a ? a.observacao : ''; ob.placeholder = 'Opcional';
+      cs.appendChild(campo('Observação', ob, 'largo'));
+      f.appendChild(cs);
+      var calc = el('p', 'calculo'); calc.setAttribute('aria-live', 'polite'); f.appendChild(calc);
+      function pctPadrao(){ var p = parceiroPorId(sp.value); return p ? p.pctAtendimento : 0; }
+      if(!a) ip.value = emReais(pctPadrao());
+      sp.addEventListener('change', function(){ if(!a) ip.value = emReais(pctPadrao()); conta(); });
+      function conta(){
+        var v = numero(iv.value), pc = numero(ip.value);
+        calc.textContent = (v != null && !isNaN(v) && pc != null && !isNaN(pc)) ? 'Repasse para a Casa: ' + brl(Math.round(v * pc) / 100) : '';
+      }
+      [iv, ip].forEach(function(i){ i.addEventListener('input', conta); }); conta();
+      var rod = el('div', 'rodape-form'); var msg = el('p', 'msg'); msg.setAttribute('role', 'alert'); rod.appendChild(msg);
+      var cancelar = el('button', 'btn-borda', 'Cancelar'); cancelar.type = 'button'; cancelar.addEventListener('click', fechar); rod.appendChild(cancelar);
+      var salvar = el('button', 'btn', a ? 'Salvar' : 'Lançar'); salvar.type = 'submit'; rod.appendChild(salvar); f.appendChild(rod);
+      f.addEventListener('submit', function(e){
+        e.preventDefault(); msg.textContent = '';
+        var dados = { parceiro: sp.value, data: $('at-dia').value, quantidade: Number(iq.value), valorTotal: numero(iv.value), pct: numero(ip.value), observacao: ob.value.trim() };
+        if(!dados.parceiro){ msg.textContent = 'Escolha o parceiro.'; return; }
+        if(!dados.data || dados.data > HOJE){ msg.textContent = 'Escolha o dia do atendimento (hoje ou antes).'; return; }
+        if(!(dados.quantidade >= 1 && Math.floor(dados.quantidade) === dados.quantidade)){ msg.textContent = 'Digite quantos atendimentos foram feitos.'; return; }
+        if(dados.valorTotal === null || isNaN(dados.valorTotal) || dados.valorTotal < 0){ msg.textContent = 'Digite o valor total, como 600,00.'; return; }
+        if(dados.pct === null || isNaN(dados.pct) || dados.pct < 0 || dados.pct > 100){ msg.textContent = 'A porcentagem vai de 0 a 100.'; return; }
+        salvar.disabled = true;
+        escrever('form-atendimento', function(){ return a ? api('PATCH', '/api/admin/atendimentos/' + a.id, dados) : api('POST', '/api/admin/atendimentos', dados); }).then(function(ok){
+          salvar.disabled = false; if(ok){ fechar(); toast((a ? 'Lançamento atualizado. ' : 'Atendimentos lançados. ') + 'Repasse: ' + brl(Math.round(dados.valorTotal * dados.pct) / 100) + '.'); }
+        });
+      });
+      j.appendChild(f);
+    });
   }
 
   /* Horários fixos */
@@ -514,7 +789,7 @@
   }
   function recarregar(){
     return api('GET', '/api/admin/dados').then(function(r){
-      st.geral = r.geral; st.salas = r.salas; st.fixos = r.fixos; st.reservas = r.reservas;
+      st.geral = r.geral; st.salas = r.salas; st.fixos = r.fixos; st.reservas = r.reservas; st.parceiros = r.parceiros || []; st.atendimentos = r.atendimentos || [];
       hoje = deChave(r.agora.data); HOJE = r.agora.data;
       st.carregado = true; $('estado').textContent = '';
       if(podeRedesenhar()) desenhar(); else { redesenhoPendente = true; desenharMenu(); }

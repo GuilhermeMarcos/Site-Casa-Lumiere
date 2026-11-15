@@ -40,7 +40,21 @@
   }
 
   /* ===== Estado ===== */
-  var st = { sala: 0, data: null, sel: [], ocupados: {}, minhas: [], pronto: false, conta: null };
+  var st = { sala: 0, data: null, sel: [], ocupados: {}, minhas: [], pronto: false, conta: null, parceria: null, extrato: null };
+  /* Preço: a combinação mais barata da tabela da sala (o servidor faz a mesma conta e é ele quem grava o valor) */
+  var fmtBRL = new Intl.NumberFormat('pt-BR', {style:'currency', currency:'BRL'});
+  function brl(v){ return fmtBRL.format(v); }
+  function calcularValor(precos, n){
+    if(!precos || !precos.length || !(n > 0)) return null;
+    var m = [0]; for(var i = 1; i <= n; i++){ m[i] = Infinity; precos.forEach(function(p){ var c = Math.round(p.valor * 100); if(p.horas <= i && m[i - p.horas] + c < m[i]) m[i] = m[i - p.horas] + c; }); }
+    return isFinite(m[n]) ? m[n] / 100 : null;
+  }
+  function valorPara(sala, n){
+    var s = CONFIG.salas[sala]; var cheio = s ? calcularValor(s.precos, n) : null;
+    if(cheio == null || !st.parceria) return { valor: cheio, cheio: cheio };
+    return { valor: Math.round(Math.round(cheio * 100) * (100 - st.parceria.descontoAluguel) / 100) / 100, cheio: cheio };
+  }
+  function pctTxt(v){ return String(v).replace('.', ',') + '%'; }
   var dias = [], meses = [], hoje = agoraLocal().data;
   function montarDias(base){
     hoje = base;
@@ -64,7 +78,8 @@
     if(carregando) return carregando;
     var salaAntes = CONFIG.salas[st.sala] ? CONFIG.salas[st.sala].id : null;
     carregando = api('GET', '/api/agenda').then(function(r){
-      CONFIG.salas = r.salas.map(function(s){ return { id: s.id, nome: s.nome, tipo: s.tipo, descricao: s.descricao, foto: s.foto, indisponivel: !s.disponivel }; });
+      CONFIG.salas = r.salas.map(function(s){ return { id: s.id, nome: s.nome, tipo: s.tipo, descricao: s.descricao, foto: s.foto, precos: s.precos || [], indisponivel: !s.disponivel }; });
+      st.parceria = r.parceria || null;
       CONFIG.fixos = r.fixos;
       ['abre', 'fecha', 'diasAFrente', 'diasAbertos', 'whatsappAgatha'].forEach(function(k){ if(r.geral[k] !== undefined) CONFIG[k] = r.geral[k]; });
       var mapa = {}; r.ocupados.forEach(function(o){ mapa[o.sala + '_' + o.data + '_' + o.hora] = o; });
@@ -82,7 +97,8 @@
     return carregando;
   }
   function carregarMinhas(){
-    if(!st.conta){ st.minhas = []; desenharMinhas(); return Promise.resolve(); }
+    if(!st.conta){ st.minhas = []; st.extrato = null; desenharExtrato(); desenharMinhas(); return Promise.resolve(); }
+    carregarExtrato();
     return api('GET', '/api/reservas').then(function(r){ st.minhas = r.reservas; desenharMinhas(); }).catch(function(){ desenharMinhas(); });
   }
 
@@ -138,7 +154,7 @@
   var fotoAtual = -1;
   function desenharFoto(){
     var s = CONFIG.salas[st.sala]; if(!s) return;
-    var chave = st.sala + '|' + s.foto + '|' + s.nome + '|' + s.tipo;
+    var chave = st.sala + '|' + s.foto + '|' + s.nome + '|' + s.tipo + '|' + JSON.stringify(s.precos) + '|' + JSON.stringify(st.parceria);
     if(fotoAtual === chave) return;
     fotoAtual = chave;
     var f = $('foto-sala'); f.textContent = '';
@@ -148,6 +164,18 @@
     leg.innerHTML = '<strong></strong><span></span>';
     leg.querySelector('strong').textContent = s.nome; leg.querySelector('span').textContent = s.descricao || s.tipo;
     f.appendChild(leg);
+    /* Preços pequenos no canto da foto */
+    if(s.precos && s.precos.length){
+      var tag = d.createElement('div'); tag.className = 'precos-sala';
+      var tit = d.createElement('span'); tit.className = 'precos-tit'; tit.textContent = 'Aluguel'; tag.appendChild(tit);
+      s.precos.slice(0, 5).forEach(function(p){
+        var l = d.createElement('span'); l.className = 'precos-linha';
+        var h = d.createElement('b'); h.textContent = p.horas + 'h'; l.appendChild(h);
+        l.appendChild(d.createTextNode(' ' + brl(p.valor))); tag.appendChild(l);
+      });
+      if(st.parceria){ var pc = d.createElement('span'); pc.className = 'precos-parc'; pc.textContent = 'Você tem ' + pctTxt(st.parceria.descontoAluguel) + ' de desconto'; tag.appendChild(pc); }
+      f.appendChild(tag);
+    }
   }
   function desenharMeses(alvo){
     var c = $(alvo); c.textContent = '';
@@ -246,7 +274,9 @@
       var p = d.createElement('p'); p.className = 'vazio-sel'; p.textContent = 'Escolha um ou mais horários.'; box.appendChild(p);
     } else {
       var dl = d.createElement('dl'); dl.className = 'linhas';
-      [['Dia', diaLongo(st.data)], ['Horário', faixa(st.sel)], ['Total', st.sel.length + (st.sel.length === 1 ? ' hora' : ' horas')]].forEach(function(l){
+      var vp = valorPara(st.sala, st.sel.length);
+      var txtValor = vp.valor == null ? 'A combinar com a Agatha' : brl(vp.valor) + (st.parceria && vp.cheio !== vp.valor ? ' (parceiro, ' + pctTxt(st.parceria.descontoAluguel) + ' de desconto)' : '');
+      [['Dia', diaLongo(st.data)], ['Horário', faixa(st.sel)], ['Total', st.sel.length + (st.sel.length === 1 ? ' hora' : ' horas')], ['Valor', txtValor]].forEach(function(l){
         var div = d.createElement('div'); var dt = d.createElement('dt'); dt.textContent = l[0]; var dd = d.createElement('dd'); dd.textContent = l[1]; div.appendChild(dt); div.appendChild(dd); dl.appendChild(div);
       });
       box.appendChild(dl);
@@ -279,6 +309,32 @@
       })(h); }
     });
   }
+  /* Extrato do parceiro: aluguel do mês, atendimentos lançados pela equipe e o repasse */
+  var fmtMesAno = new Intl.DateTimeFormat('pt-BR', {month:'long', year:'numeric', timeZone:'UTC'});
+  function carregarExtrato(){
+    if(!st.conta || !st.parceria){ st.extrato = null; desenharExtrato(); return; }
+    api('GET', '/api/parceria').then(function(r){ st.extrato = r.parceria ? r : null; desenharExtrato(); }).catch(function(){});
+  }
+  function desenharExtrato(){
+    var box = $('extrato');
+    if(!box){ box = d.createElement('section'); box.id = 'extrato'; box.className = 'extrato'; box.setAttribute('aria-label', 'Extrato da parceria'); $('minhas').parentNode.appendChild(box); }
+    box.textContent = ''; box.hidden = !st.extrato;
+    if(!st.extrato) return;
+    var p = st.extrato.parceria;
+    var h = d.createElement('h3'); h.innerHTML = 'Sua <em>parceria</em>'; box.appendChild(h);
+    var reg = d.createElement('p'); reg.className = 'extrato-regra'; reg.textContent = pctTxt(p.descontoAluguel) + ' de desconto no aluguel · ' + pctTxt(p.pctAtendimento) + ' dos atendimentos para a Casa'; box.appendChild(reg);
+    if(!st.extrato.meses.length){ var v = d.createElement('p'); v.className = 'extrato-vazio'; v.textContent = 'Os atendimentos que a equipe lançar aparecem aqui, mês a mês.'; box.appendChild(v); return; }
+    var tab = d.createElement('table'); tab.className = 'extrato-tab';
+    tab.innerHTML = '<thead><tr><th scope="col">Mês</th><th scope="col">Aluguel</th><th scope="col">Atendimentos</th><th scope="col">Repasse</th><th scope="col">A pagar</th></tr></thead><tbody></tbody>';
+    st.extrato.meses.forEach(function(m){
+      var tr = d.createElement('tr');
+      [cap(fmtMesAno.format(deChave(m.mes + '-01'))), brl(m.aluguel), m.atendimentos + ' (' + brl(m.valorAtendimentos) + ')', brl(m.repasse), m.repassePendente ? brl(m.repassePendente) : 'Em dia'].forEach(function(t, i){
+        var c = d.createElement(i ? 'td' : 'th'); if(!i) c.scope = 'row'; c.textContent = t; c.setAttribute('data-rotulo', ['Mês', 'Aluguel', 'Atendimentos', 'Repasse', 'A pagar'][i]); tr.appendChild(c);
+      });
+      tab.querySelector('tbody').appendChild(tr);
+    });
+    var rolar = d.createElement('div'); rolar.className = 'extrato-rolar'; rolar.appendChild(tab); box.appendChild(rolar);
+  }
   function desenharMinhas(){
     var lista = st.minhas.filter(function(r){ return r.data >= agoraLocal().data; });
     var ativas = lista.filter(function(r){ return r.status !== 'expirada'; }).length;
@@ -302,9 +358,9 @@
       var i = indicePorId(r.sala), sala = CONFIG.salas[i];
       li.querySelector('.r-arco').textContent = sala ? sala.nome.replace('Sala ', '') : '';
       li.querySelector('h3').textContent = nomeSalaId(r.sala);
-      li.querySelector('p').textContent = cap(diaLongo(r.data)) + ', ' + faixa(r.horas);
+      li.querySelector('p').textContent = cap(diaLongo(r.data)) + ', ' + faixa(r.horas) + (r.valor != null ? ' · ' + brl(r.valor) : '');
       var stt = li.querySelector('.status'), acoes = li.querySelector('.acoes');
-      var msg = msgAgatha(r.sala, r.data, r.horas, r.nome, r.especialidade, r.telefone);
+      var msg = msgAgatha(r.sala, r.data, r.horas, r.nome, r.especialidade, r.telefone, r.valor, r.descontoPct);
       if(r.status === 'confirmada'){
         stt.className = 'status ok'; stt.textContent = 'Reservada';
         acoes.appendChild(botaoWhats('Olá, Agatha! Sobre a minha reserva da ' + nomeSalaId(r.sala) + ' em ' + diaLongo(r.data) + ', ' + faixa(r.horas) + ':', 'Falar com a Agatha'));
@@ -356,11 +412,12 @@
 
   /* ===== Mensagem para a Agatha ===== */
   var ICONE_WA = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5C6.5 2.5 2.2 6.4 2.2 11.2c0 2.6 1.2 4.9 3.2 6.5L4.5 21.5l4.4-2.2c1 .3 2 .4 3.1.4 5.5 0 9.8-3.9 9.8-8.6S17.5 2.5 12 2.5z"/></svg>';
-  function msgAgatha(salaId, data, horas, nome, esp, tel){
+  function msgAgatha(salaId, data, horas, nome, esp, tel, valor, descontoPct){
     var linhas = ['Olá, Agatha! Fiz uma pré-reserva pelo site da Casa Lumière:', '',
       'Sala: ' + nomeSalaId(salaId),
       'Dia: ' + diaLongo(data),
       'Horário: ' + faixa(horas) + ' (' + horas.length + (horas.length === 1 ? ' hora)' : ' horas)'),
+      'Valor: ' + (valor != null ? brl(valor) + (descontoPct ? ' (parceiro, ' + pctTxt(descontoPct) + ' de desconto)' : '') : 'a combinar'),
       'Nome: ' + nome];
     if(esp) linhas.push('Especialidade: ' + esp);
     linhas.push('WhatsApp: ' + tel, '', 'Pode confirmar a reserva e me dizer como faço o pagamento?');
@@ -389,10 +446,10 @@
     f.querySelector('.pre-txt').textContent = 'Para garantir, envie os detalhes para a Agatha. Ela combina o pagamento com você e confirma a reserva. Sem confirmação, o horário volta a ficar livre em ' + EXPIRA_TXT + '.';
     f.querySelector('.num-agatha').textContent = 'Agatha: ' + telVisivel(CONFIG.whatsappAgatha);
     var dl = f.querySelector('dl');
-    [['Sala', nomeSalaId(r.sala)], ['Dia', diaLongo(r.data)], ['Horário', faixa(r.horas)], ['Total', r.horas.length + (r.horas.length === 1 ? ' hora' : ' horas')]].forEach(function(l){
+    [['Sala', nomeSalaId(r.sala)], ['Dia', diaLongo(r.data)], ['Horário', faixa(r.horas)], ['Valor', r.valor != null ? brl(r.valor) : 'A combinar']].forEach(function(l){
       var div = d.createElement('div'), dt = d.createElement('dt'), dd = d.createElement('dd'); dt.textContent = l[0]; dd.textContent = l[1]; div.appendChild(dt); div.appendChild(dd); dl.appendChild(div);
     });
-    var texto = msgAgatha(r.sala, r.data, r.horas, r.nome, r.especialidade, r.telefone);
+    var texto = msgAgatha(r.sala, r.data, r.horas, r.nome, r.especialidade, r.telefone, r.valor, r.descontoPct);
     var btn = f.querySelector('.wa-app'), web = f.querySelector('.wa-web');
     btn.href = linkAgatha(texto); btn.innerHTML = ICONE_WA + 'WhatsApp';
     web.href = linkAgatha(texto, true);

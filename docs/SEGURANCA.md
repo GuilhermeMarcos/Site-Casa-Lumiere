@@ -28,6 +28,10 @@ Revisão feita em 14/11/2026. Os ataques abaixo são testados automaticamente em
 | Chaves no GitHub | Nenhuma chave no repositório nem no histórico. Elas ficam só nas variáveis da Vercel. |
 | Conta com e-mail de outra pessoa | Com o e-mail configurado, a conta só é criada depois de digitar o código de 6 números que chegou no e-mail. |
 | Recuperar senha | Código de 6 números por e-mail: guardado só como hash, vale 10 minutos, 5 tentativas, uso único. Pedidos limitados por e-mail e por IP. A resposta é a mesma exista conta ou não. |
+| Mudar o preço pelo navegador | O valor da reserva é calculado no servidor pela tabela da sala. Valor, desconto ou parceria enviados pelo navegador são ignorados. |
+| Ganhar desconto de parceiro sem ser | A parceria é ligada ao e-mail e só vale se a conta tiver o e-mail confirmado por código ou for conferida pela equipe no painel. Se a conta for apagada e outra pessoa criar uma nova com o mesmo e-mail, a conferência antiga não passa para ela. |
+| Ver o extrato de outro parceiro | Cada parceiro vê só o próprio extrato; cadastrar parceiro, lançar atendimento e dar baixa é só da equipe. |
+| Alterar o histórico de repasses | A porcentagem fica gravada em cada lançamento; mudar a parceria depois não altera o que já foi lançado. Parceiro com lançamentos não é apagado, só desativado. |
 | LGPD | O cliente pode excluir a própria conta. Pré-reservas abertas somem junto. |
 
 ## O que depende de você (e é onde a maioria dos ataques acontece)

@@ -58,13 +58,15 @@ No teste local, a conta da equipe usa o e-mail `equipe@casalumiere.com.br` e o c
 | Tabela | Para que serve |
 |---|---|
 | `usuarios` | Contas (senha guardada com scrypt, nunca a senha em si) |
-| `salas` | Nome, tipo, descrição, foto, disponível, valor de referência |
+| `salas` | Nome, tipo, descrição, foto, disponível e a tabela de preços (horas e valor) |
 | `fixos` | Horários fixos: toda semana, a cada 15 dias ou uma vez |
-| `reservas` | Pré-reservas e reservas, com quem, quando e a situação |
+| `reservas` | Pré-reservas e reservas, com quem, quando, a situação e o valor calculado |
+| `parceiros` | Quem tem desconto no aluguel e repassa uma porcentagem dos atendimentos |
+| `atendimentos` | Atendimentos lançados pela equipe, com o repasse e se já foi recebido |
 | `reserva_horas` | Uma linha por hora ocupada. A chave sala + dia + hora impede reserva dupla |
 | `config` | Funcionamento: horário, dias abertos, antecedência, WhatsApp da Agatha |
 | `tentativas` | Trava de 15 minutos depois de 8 senhas erradas |
 | `codigos` | Códigos de e-mail (só o hash), valem 10 minutos e uma única vez |
 | `limites` | Contadores contra abuso: login, cadastro, códigos e pré-reservas por IP |
 
-O valor por hora fica só no painel. Ele não aparece no site porque é combinado no WhatsApp.
+A equipe monta a tabela de preços de cada sala no painel. O site mostra os preços no canto da foto e o total na hora de reservar; quem calcula o valor gravado é o servidor.
