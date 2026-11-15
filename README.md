@@ -4,6 +4,7 @@ Site da Casa Lumière (Holambra-SP) com agendamento de salas por hora, conta de 
 
 - Site: páginas em HTML, CSS e JS na raiz.
 - Agendamento: `salas.html`. Quem tem conta pré-reserva e manda a mensagem pronta para a Agatha no WhatsApp. Sem confirmação, a pré-reserva expira em 1h30.
+- Confirmação em 1 clique: `confirmar.html?r=...`, o link que vai na mensagem do cliente para a Agatha. Só funciona com a conta da equipe.
 - Painel da equipe: `painel.html`. Confirma pré-reservas, cria reservas feitas pelo WhatsApp, altera salas, fotos, horários fixos e funcionamento.
 - Backend: `api/` (função da Vercel em Node), banco Postgres (Neon) e fotos no Vercel Blob.
 - Requisitos, MVP e sprints: `docs/PROJETO.md`.
