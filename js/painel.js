@@ -133,7 +133,7 @@
     if(!st.carregado){ titulo.innerHTML = 'Painel da <em>Casa</em>'; sub.textContent = ''; return; }
     var nomeCurto = /\s(e|E)\s/.test(st.nome || '') ? st.nome.trim() : (st.nome || '').trim().split(/\s+/)[0]; /* conta da dupla: "Luiza e Agatha" */
     if(st.aba === 'inicio'){ titulo.innerHTML = 'Olá, <em></em>'; titulo.querySelector('em').textContent = nomeCurto || 'equipe'; sub.textContent = 'Hoje é ' + limpa(fmtLongo.format(hoje)) + '.'; }
-    else { titulo.textContent = SECOES.filter(function(s){ return s[0] === st.aba; })[0][1]; sub.textContent = {reservas:'Confirme pré-reservas, crie e altere reservas.', salas:'Nome, tipo, foto, valor por hora e disponibilidade de cada sala.', fixos:'Horários que já ficam reservados e se repetem.', funcionamento:'Horário de abertura, dias e contato que recebe as pré-reservas.'}[st.aba]; }
+    else { titulo.textContent = SECOES.filter(function(s){ return s[0] === st.aba; })[0][1]; sub.textContent = {reservas:'Confirme pré-reservas, crie e altere reservas.', salas:'Nome, tipo, foto, preços e disponibilidade de cada sala.', parceiros:'Desconto no aluguel, atendimentos lançados e repasses.', fixos:'Horários que já ficam reservados e se repetem.', funcionamento:'Horário de abertura, dias e contato que recebe as pré-reservas.'}[st.aba]; }
     var s = el('div', 'secao'); s.setAttribute('role', 'tabpanel'); s.setAttribute('aria-labelledby', 'tab-' + st.aba);
     ({inicio: telaInicio, reservas: telaReservas, salas: telaSalas, parceiros: telaParceiros, fixos: telaFixos, funcionamento: telaFuncionamento})[st.aba](s);
     area.appendChild(s);
