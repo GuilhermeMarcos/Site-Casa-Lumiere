@@ -51,7 +51,7 @@
   }
   function telaSemAcesso(){
     limpar();
-    titulo('Link da <em>equipe</em>', 'Este link é para a equipe da Casa confirmar a reserva depois de conferir o pagamento. Se você é cliente, não precisa fazer nada: a Agatha confirma e te avisa pelo WhatsApp.');
+    titulo('Link da <em>equipe</em>', 'Este link é para a equipe da Casa confirmar a reserva depois de conferir o pagamento. Se você é cliente, não precisa fazer nada: a Casa Lumière confirma e te avisa pelo WhatsApp.');
     var a = el('a', 'btn linha', 'Ver minhas reservas'); a.href = 'salas.html#minhas'; tela.appendChild(a);
   }
 

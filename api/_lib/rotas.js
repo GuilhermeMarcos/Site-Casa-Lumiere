@@ -263,10 +263,10 @@ async function minhas(req) {
 async function preReservar(req, _p, c) {
   const u = await exigirLogin(req);
   if (!telefoneOk(u.telefone)) throw new Falha(400, 'telefone', 'Coloque o seu WhatsApp na sua conta antes de reservar.');
-  await limitar('pre|' + ipDe(req), 20, 3600, 'Muitas pré-reservas daqui em pouco tempo. Fale com a Agatha pelo WhatsApp.');
+  await limitar('pre|' + ipDe(req), 20, 3600, 'Muitas pré-reservas daqui em pouco tempo. Fale com a Casa Lumière pelo WhatsApp.');
   const v = await validarPedido({ sala: texto(c.sala, 40), data: texto(c.data, 10), horas: c.horas }, { equipe: false });
   const [abertas] = await q("SELECT count(*)::int AS n FROM reservas WHERE usuario_id = $1 AND status = 'pre'", [u.id]);
-  if (abertas.n >= MAX_PRE_POR_CLIENTE) throw new Falha(429, 'limite_pre', 'Você já tem pré-reservas esperando a Agatha. Fale com ela antes de fazer outra.');
+  if (abertas.n >= MAX_PRE_POR_CLIENTE) throw new Falha(429, 'limite_pre', 'Você já tem pré-reservas esperando a confirmação da Casa Lumière. Fale com a equipe antes de fazer outra.');
   const id = randomUUID();
   const data = texto(c.data, 10);
   const preco = precoDaReserva(v.sala, v.horas.length, await parceriaDe(u));
@@ -288,7 +288,7 @@ async function cancelarMinha(req, p) {
   const u = await exigirLogin(req);
   const [r] = await q('SELECT status FROM reservas WHERE id = $1 AND usuario_id = $2', [p.id, u.id]);
   if (!r) throw new Falha(404, 'reserva', 'Reserva não encontrada.');
-  if (r.status === 'confirmada') throw new Falha(409, 'confirmada', 'Esta reserva já foi confirmada. Para cancelar, fale com a Agatha.');
+  if (r.status === 'confirmada') throw new Falha(409, 'confirmada', 'Esta reserva já foi confirmada. Para cancelar, fale com a Casa Lumière.');
   await q('DELETE FROM reservas WHERE id = $1', [p.id]);
   return [200, { ok: true }];
 }
