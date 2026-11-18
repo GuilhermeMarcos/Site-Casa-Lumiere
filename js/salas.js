@@ -275,7 +275,7 @@
     } else {
       var dl = d.createElement('dl'); dl.className = 'linhas';
       var vp = valorPara(st.sala, st.sel.length);
-      var txtValor = vp.valor == null ? 'A combinar com a Agatha' : brl(vp.valor) + (st.parceria && vp.cheio !== vp.valor ? ' (parceiro, ' + pctTxt(st.parceria.descontoAluguel) + ' de desconto)' : '');
+      var txtValor = vp.valor == null ? 'A combinar com a Casa Lumière' : brl(vp.valor) + (st.parceria && vp.cheio !== vp.valor ? ' (parceiro, ' + pctTxt(st.parceria.descontoAluguel) + ' de desconto)' : '');
       [['Dia', diaLongo(st.data)], ['Horário', faixa(st.sel)], ['Total', st.sel.length + (st.sel.length === 1 ? ' hora' : ' horas')], ['Valor', txtValor]].forEach(function(l){
         var div = d.createElement('div'); var dt = d.createElement('dt'); dt.textContent = l[0]; var dd = d.createElement('dd'); dd.textContent = l[1]; div.appendChild(dt); div.appendChild(dd); dl.appendChild(div);
       });
@@ -349,7 +349,7 @@
     }
     if(!lista.length){
       var v = d.createElement('li'); v.className = 'vazio';
-      v.innerHTML = '<strong>Nenhuma reserva ainda</strong>Quando você pré-reservar uma sala, ela aparece aqui, com o atalho para falar com a Agatha e a opção de cancelar.';
+      v.innerHTML = '<strong>Nenhuma reserva ainda</strong>Quando você pré-reservar uma sala, ela aparece aqui, com o atalho para falar com a Casa Lumière e a opção de cancelar.';
       ul.appendChild(v); return;
     }
     lista.forEach(function(r){
@@ -363,10 +363,10 @@
       var msg = msgAgatha(r.sala, r.data, r.horas, r.nome, r.especialidade, r.telefone, r.valor, r.descontoPct, r.id);
       if(r.status === 'confirmada'){
         stt.className = 'status ok'; stt.textContent = 'Reservada';
-        acoes.appendChild(botaoWhats('Olá, Agatha! Sobre a minha reserva da ' + nomeSalaId(r.sala) + ' em ' + diaLongo(r.data) + ', ' + faixa(r.horas) + ':', 'Falar com a Agatha'));
+        acoes.appendChild(botaoWhats('Olá, Casa Lumière! Sobre a minha reserva da ' + nomeSalaId(r.sala) + ' em ' + diaLongo(r.data) + ', ' + faixa(r.horas) + ':', 'Falar com a Casa'));
       } else if(r.status === 'pre'){
-        stt.className = 'status pre'; stt.textContent = 'Pré-reserva: aguardando a Agatha' + (r.expiraEm ? '. Vale até ' + fmtHora.format(new Date(r.expiraEm)) : '');
-        acoes.appendChild(botaoWhats(msg, 'Falar com a Agatha'));
+        stt.className = 'status pre'; stt.textContent = 'Pré-reserva: aguardando a confirmação da Casa' + (r.expiraEm ? '. Vale até ' + fmtHora.format(new Date(r.expiraEm)) : '');
+        acoes.appendChild(botaoWhats(msg, 'Falar com a Casa'));
         acoes.appendChild(botaoCancelar(r, 'Cancelar'));
       } else {
         stt.className = 'status exp'; stt.textContent = 'Expirou sem confirmação';
@@ -413,7 +413,7 @@
   /* ===== Mensagem para a Agatha ===== */
   var ICONE_WA = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5C6.5 2.5 2.2 6.4 2.2 11.2c0 2.6 1.2 4.9 3.2 6.5L4.5 21.5l4.4-2.2c1 .3 2 .4 3.1.4 5.5 0 9.8-3.9 9.8-8.6S17.5 2.5 12 2.5z"/></svg>';
   function msgAgatha(salaId, data, horas, nome, esp, tel, valor, descontoPct, reservaId){
-    var linhas = ['Olá, Agatha! Fiz uma pré-reserva pelo site da Casa Lumière:', '',
+    var linhas = ['Olá, Casa Lumière! Fiz uma pré-reserva pelo site:', '',
       'Sala: ' + nomeSalaId(salaId),
       'Dia: ' + diaLongo(data),
       'Horário: ' + faixa(horas) + ' (' + horas.length + (horas.length === 1 ? ' hora)' : ' horas)'),
@@ -443,10 +443,10 @@
   function janelaPre(r){
     var antes = d.activeElement;
     var f = d.createElement('div'); f.className = 'pre-fundo';
-    f.innerHTML = '<div class="pre-caixa" role="dialog" aria-modal="true" aria-labelledby="pre-titulo"><img class="mono-pre" alt=""><h2 id="pre-titulo">Horário <em>pré-reservado</em></h2><p class="pre-txt"></p><dl></dl><p class="enviar-por">Enviar para a Agatha pelo</p><div class="duas-wa"><a class="btn btn-grande wa-app" target="_blank" rel="noopener"></a><a class="btn btn-grande wa-web" target="_blank" rel="noopener">WhatsApp Web</a></div><p class="num-agatha"></p><button type="button" class="depois">Enviar depois</button></div>';
+    f.innerHTML = '<div class="pre-caixa" role="dialog" aria-modal="true" aria-labelledby="pre-titulo"><img class="mono-pre" alt=""><h2 id="pre-titulo">Horário <em>pré-reservado</em></h2><p class="pre-txt"></p><dl></dl><p class="enviar-por">Enviar para a Casa Lumière pelo</p><div class="duas-wa"><a class="btn btn-grande wa-app" target="_blank" rel="noopener"></a><a class="btn btn-grande wa-web" target="_blank" rel="noopener">WhatsApp Web</a></div><p class="num-agatha"></p><button type="button" class="depois">Enviar depois</button></div>';
     f.querySelector('.mono-pre').src = MONO;
-    f.querySelector('.pre-txt').textContent = 'Para garantir, envie os detalhes para a Agatha. Ela combina o pagamento com você e confirma a reserva. Sem confirmação, o horário volta a ficar livre em ' + EXPIRA_TXT + '.';
-    f.querySelector('.num-agatha').textContent = 'Agatha: ' + telVisivel(CONFIG.whatsappAgatha);
+    f.querySelector('.pre-txt').textContent = 'Para garantir, envie os detalhes para a Casa Lumière. A equipe combina o pagamento com você e confirma a reserva. Sem confirmação, o horário volta a ficar livre em ' + EXPIRA_TXT + '.';
+    f.querySelector('.num-agatha').textContent = 'Casa Lumière: ' + telVisivel(CONFIG.whatsappAgatha);
     var dl = f.querySelector('dl');
     [['Sala', nomeSalaId(r.sala)], ['Dia', diaLongo(r.data)], ['Horário', faixa(r.horas)], ['Valor', r.valor != null ? brl(r.valor) : 'A combinar']].forEach(function(l){
       var div = d.createElement('div'), dt = d.createElement('dt'), dd = d.createElement('dd'); dt.textContent = l[0]; dd.textContent = l[1]; div.appendChild(dt); div.appendChild(dd); dl.appendChild(div);
@@ -490,7 +490,7 @@
     enviando = true; $('f-btn').disabled = true; $('f-btn').textContent = 'Pré-reservando…';
     api('POST', '/api/reservas', {sala: salaId, data: data, horas: horas}).then(function(r){
       enviando = false; st.sel = [];
-      notificar('ok', nomeSalaId(salaId) + ' pré-reservada', cap(diaLongo(data)) + ', ' + faixa(horas) + '. Falta a confirmação da Agatha.');
+      notificar('ok', nomeSalaId(salaId) + ' pré-reservada', cap(diaLongo(data)) + ', ' + faixa(horas) + '. Falta a confirmação da Casa.');
       janelaPre(r.reserva);
       return Promise.all([carregar(), carregarMinhas()]);
     }).catch(function(err){
