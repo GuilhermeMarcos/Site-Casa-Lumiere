@@ -227,8 +227,8 @@ body{margin:0}
 .parc.off{opacity:.6}
 .parc .sala-nome{font-family:var(--display);font-size:1.35rem;line-height:1.1}
 .parc .pessoa{font-size:.875rem;color:var(--muted);margin-top:.1rem;word-break:break-all}
-.parc .regras{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.55rem}
-.parc .regras span{font-size:.75rem;font-weight:600;padding:.3em .75em;border-radius:999px;background:#fff;box-shadow:inset 0 0 0 1px var(--line);color:var(--ink)}
+.parc .regras,.prof .regras{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.55rem}
+.parc .regras span,.prof .regras span{font-size:.75rem;font-weight:600;padding:.3em .75em;border-radius:999px;background:#fff;box-shadow:inset 0 0 0 1px var(--line);color:var(--ink)}
 .parc .acoes{display:flex;flex-wrap:wrap;gap:.4rem;justify-content:flex-end;align-items:center;max-width:22rem}
 .obs{font-size:.8125rem;color:var(--muted);margin-top:.4rem;font-style:italic}
 .pendente{font-size:.875rem;font-weight:700;color:var(--bronze-deep);margin-top:.4rem}
@@ -240,3 +240,10 @@ body{margin:0}
   .parc .acoes{justify-content:flex-start;max-width:none}
   .preco-linha{grid-template-columns:5.5rem minmax(0,1fr) auto}
 }
+
+/* Profissionais */
+.prof .sala-cab{margin-bottom:.35rem}
+.prof-esp{color:var(--muted);font-weight:500}
+.prof-acoes{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin-top:1.1rem}
+.prof-acoes button[disabled]{opacity:.4;cursor:default}
+@media (max-width: 760px){.sala.prof .foto{aspect-ratio:3/4;max-width:12rem;border-radius:999px 999px 8px 8px}}

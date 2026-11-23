@@ -8,9 +8,10 @@
     salas: 'M6 20V10a6 6 0 0 1 12 0v10M4 20h16M14 14v1',
     fixos: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2',
     funcionamento: 'M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1M15 4v4M9 10v4M17 16v4',
+    profissionais: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0',
     parceiros: 'M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM16 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM2 20a6 6 0 0 1 12 0M10 20a6 6 0 0 1 12 0'
   };
-  var SECOES = [['inicio', 'Início'], ['reservas', 'Reservas'], ['salas', 'Salas e valores'], ['parceiros', 'Parceiros'], ['fixos', 'Horários fixos'], ['funcionamento', 'Funcionamento']];
+  var SECOES = [['inicio', 'Início'], ['reservas', 'Reservas'], ['salas', 'Salas e valores'], ['profissionais', 'Profissionais'], ['parceiros', 'Parceiros'], ['fixos', 'Horários fixos'], ['funcionamento', 'Funcionamento']];
   var DIAS_SEM = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
   var d = document, $ = function(id){ return d.getElementById(id); };
   function el(tag, cls, txt){ var e = d.createElement(tag); if(cls) e.className = cls; if(txt != null) e.textContent = txt; return e; }
@@ -133,9 +134,9 @@
     if(!st.carregado){ titulo.innerHTML = 'Painel da <em>Casa</em>'; sub.textContent = ''; return; }
     var nomeCurto = /\s(e|E)\s/.test(st.nome || '') ? st.nome.trim() : (st.nome || '').trim().split(/\s+/)[0]; /* conta da dupla: "Luiza e Agatha" */
     if(st.aba === 'inicio'){ titulo.innerHTML = 'Olá, <em></em>'; titulo.querySelector('em').textContent = nomeCurto || 'equipe'; sub.textContent = 'Hoje é ' + limpa(fmtLongo.format(hoje)) + '.'; }
-    else { titulo.textContent = SECOES.filter(function(s){ return s[0] === st.aba; })[0][1]; sub.textContent = {reservas:'Confirme pré-reservas, crie e altere reservas.', salas:'Nome, tipo, foto, preços e disponibilidade de cada sala.', parceiros:'Desconto no aluguel, atendimentos lançados e repasses.', fixos:'Horários que já ficam reservados e se repetem.', funcionamento:'Horário de abertura, dias e contato que recebe as pré-reservas.'}[st.aba]; }
+    else { titulo.textContent = SECOES.filter(function(s){ return s[0] === st.aba; })[0][1]; sub.textContent = {reservas:'Confirme pré-reservas, crie e altere reservas.', salas:'Nome, tipo, foto, preços e disponibilidade de cada sala.', profissionais:'Quem aparece na página Profissionais do site, com foto e especialidade.', parceiros:'Desconto no aluguel, atendimentos lançados e repasses.', fixos:'Horários que já ficam reservados e se repetem.', funcionamento:'Horário de abertura, dias e contato que recebe as pré-reservas.'}[st.aba]; }
     var s = el('div', 'secao'); s.setAttribute('role', 'tabpanel'); s.setAttribute('aria-labelledby', 'tab-' + st.aba);
-    ({inicio: telaInicio, reservas: telaReservas, salas: telaSalas, parceiros: telaParceiros, fixos: telaFixos, funcionamento: telaFuncionamento})[st.aba](s);
+    ({inicio: telaInicio, reservas: telaReservas, salas: telaSalas, profissionais: telaProfissionais, parceiros: telaParceiros, fixos: telaFixos, funcionamento: telaFuncionamento})[st.aba](s);
     area.appendChild(s);
   }
   function semAcesso(){
@@ -400,6 +401,108 @@
     });
     corpo.appendChild(f); art.appendChild(corpo);
     return art;
+  }
+
+  /* Profissionais: o que aparece na página Profissionais e na galeria do início */
+  function telaProfissionais(s){
+    var b = bloco('Profissionais', 'A ordem daqui é a ordem do site. Quem está escondido não aparece para as pessoas');
+    var novo = el('button', 'btn', 'Novo profissional'); novo.type = 'button'; novo.addEventListener('click', function(){ formProfissional(null); });
+    b.querySelector('.bloco-cab').appendChild(novo);
+    var lista = st.profissionais || [];
+    if(!lista.length) b.appendChild(vazio('Nenhum profissional ainda', 'Use "Novo profissional" para cadastrar nome, especialidade e foto.'));
+    lista.forEach(function(x, i){ b.appendChild(cartaoProfissional(x, i, lista.length)); });
+    s.appendChild(b);
+  }
+  function botaoFoto(id, temFoto, rota, nome){
+    var inp = el('input'); inp.type = 'file'; inp.accept = 'image/png,image/jpeg,image/webp'; inp.id = id;
+    var lab = el('label'); lab.htmlFor = id; lab.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h4l2-2h4l2 2h4v12H4zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"/></svg>'; lab.appendChild(d.createTextNode(temFoto ? 'Trocar foto' : 'Enviar foto'));
+    inp.addEventListener('change', function(){
+      var file = inp.files && inp.files[0]; if(!file) return;
+      enviarFoto(file, rota, function(t){ lab.lastChild.nodeValue = t; }, temFoto).then(function(ok){ if(ok) toast('Foto de ' + nome + ' atualizada.'); });
+    });
+    return [inp, lab];
+  }
+  /* Reduz a foto no navegador e envia. Devolve true se deu certo */
+  function enviarFoto(file, rota, rotulo, temFoto){
+    var volta = function(){ rotulo(temFoto ? 'Trocar foto' : 'Enviar foto'); };
+    if(!/^image\/(jpeg|png|webp)$/.test(file.type)){ toast('Use uma foto em JPG, PNG ou WebP.', true); return Promise.resolve(false); }
+    if(file.size > 25 * 1024 * 1024){ toast('A foto é grande demais. Use uma de até 25 MB.', true); return Promise.resolve(false); }
+    rotulo('Enviando…');
+    return reduzirFoto(file).then(function(dataUrl){
+      return escrever('foto-' + rota, function(){ return api('POST', rota, {imagem: dataUrl}); }).then(function(ok){ if(!ok) volta(); return ok; });
+    }, function(){ volta(); toast('Não foi possível ler essa foto. Tente outra.', true); return false; });
+  }
+  function cartaoProfissional(x, i, total){
+    var art = el('article', 'sala prof' + (x.ativo ? '' : ' off'));
+    var foto = el('div', 'foto');
+    if(x.foto){ var im = el('img'); im.src = x.foto; im.alt = 'Foto de ' + x.nome; im.onerror = function(){ im.remove(); }; foto.appendChild(im); }
+    botaoFoto('pfoto-' + x.id, !!x.foto, '/api/admin/profissionais/' + x.id + '/foto', x.nome).forEach(function(e){ foto.appendChild(e); });
+    art.appendChild(foto);
+    var corpo = el('div');
+    var cab = el('div', 'sala-cab'); cab.appendChild(el('h3', null, x.nome));
+    var ch = el('label', 'chave'); var cb = el('input'); cb.type = 'checkbox'; cb.checked = !!x.ativo; cb.id = 'pativo-' + x.id;
+    ch.appendChild(cb); ch.appendChild(el('span', 'trilho')); var rot = el('span', null, cb.checked ? 'Aparece no site' : 'Escondido'); ch.appendChild(rot);
+    cb.addEventListener('change', function(){ var v = cb.checked; rot.textContent = v ? 'Aparece no site' : 'Escondido'; escrever('p' + x.id, function(){ return api('PATCH', '/api/admin/profissionais/' + x.id, {ativo: v}); }).then(function(ok){ if(ok) toast(x.nome + (v ? ' agora aparece no site.' : ' não aparece mais no site.')); else { cb.checked = !v; rot.textContent = !v ? 'Aparece no site' : 'Escondido'; } }); });
+    cab.appendChild(ch); corpo.appendChild(cab);
+    if(x.especialidade) corpo.appendChild(el('p', 'prof-esp', x.especialidade));
+    var info = el('div', 'regras');
+    info.appendChild(el('span', null, x.registro ? 'Registro: ' + x.registro : 'Sem registro do conselho'));
+    info.appendChild(el('span', null, x.whatsapp ? 'WhatsApp: ' + formatarTel(x.whatsapp) : 'Botão leva para o contato da Casa'));
+    if(!x.foto) info.appendChild(el('span', null, 'Sem foto'));
+    corpo.appendChild(info);
+    var ac = el('div', 'acoes prof-acoes');
+    var ed = el('button', 'btn', 'Editar'); ed.type = 'button'; ed.addEventListener('click', function(){ formProfissional(x); }); ac.appendChild(ed);
+    [['cima', 'Subir', i === 0], ['baixo', 'Descer', i === total - 1]].forEach(function(m){
+      var bt = el('button', 'btn-borda', m[1]); bt.type = 'button'; bt.disabled = m[2];
+      bt.addEventListener('click', function(){ escrever('ordem-prof', function(){ return api('POST', '/api/admin/profissionais/' + x.id + '/mover', {para: m[0]}); }); });
+      ac.appendChild(bt);
+    });
+    var rm = el('button', 'btn-texto perigo', 'Remover'); rm.type = 'button';
+    rm.addEventListener('click', function(){
+      if(!rm.dataset.ok){ rm.dataset.ok = '1'; rm.textContent = 'Toque de novo para remover'; setTimeout(function(){ if(rm.isConnected){ delete rm.dataset.ok; rm.textContent = 'Remover'; } }, 5000); return; }
+      escrever('p' + x.id, function(){ return api('DELETE', '/api/admin/profissionais/' + x.id); }).then(function(ok){ if(ok) toast(x.nome + ' foi removido(a) do site.'); });
+    });
+    ac.appendChild(rm);
+    corpo.appendChild(ac);
+    art.appendChild(corpo);
+    return art;
+  }
+  function formProfissional(x){
+    abrirJanela(x ? 'Editar profissional' : 'Novo profissional', function(j, fechar){
+      var f = el('form'); f.noValidate = true; var cs = el('div', 'campos');
+      cs.appendChild(campo('Nome', entrada('pro-nome', 'text', x ? x.nome : '', {autocomplete:'off'})));
+      cs.appendChild(campo('Especialidade', entrada('pro-esp', 'text', x ? x.especialidade : '', {placeholder:'Ex.: Psicóloga Clínica'})));
+      cs.appendChild(campo('Registro no conselho (opcional)', entrada('pro-reg', 'text', x ? x.registro : '', {placeholder:'Ex.: CRP 06/123456'})));
+      cs.appendChild(campo('WhatsApp (opcional)', entrada('pro-tel', 'tel', x && x.whatsapp ? formatarTel(x.whatsapp) : '', {inputmode:'tel', placeholder:'(19) 99999-9999'}), null, 'Em branco, o botão do site leva para o contato da Casa.'));
+      cs.appendChild(campo('Crédito da foto (opcional)', entrada('pro-cred', 'text', x ? x.credito : '', {placeholder:'Ex.: Foto: Nome do fotógrafo'})));
+      var arq = entrada('pro-foto', 'file', null, {accept:'image/png,image/jpeg,image/webp'});
+      cs.appendChild(campo(x && x.foto ? 'Trocar foto (opcional)' : 'Foto', arq, 'largo', 'Foto em pé (retrato) fica melhor. JPG, PNG ou WebP.'));
+      f.appendChild(cs);
+      var rod = el('div', 'rodape-form'); var msg = el('p', 'msg'); msg.setAttribute('role', 'alert'); rod.appendChild(msg);
+      var cancelar = el('button', 'btn-borda', 'Cancelar'); cancelar.type = 'button'; cancelar.addEventListener('click', fechar); rod.appendChild(cancelar);
+      var salvar = el('button', 'btn', x ? 'Salvar' : 'Cadastrar profissional'); salvar.type = 'submit'; rod.appendChild(salvar); f.appendChild(rod);
+      f.addEventListener('submit', function(e){
+        e.preventDefault(); msg.textContent = '';
+        var dados = { nome: $('pro-nome').value.trim(), especialidade: $('pro-esp').value.trim(), registro: $('pro-reg').value.trim(), whatsapp: $('pro-tel').value.trim(), credito: $('pro-cred').value.trim() };
+        if(dados.nome.length < 2){ msg.textContent = 'Digite o nome.'; return; }
+        var dig = dados.whatsapp.replace(/\D/g, ''); if(dig && (dig.length < 10 || dig.length > 13)){ msg.textContent = 'Digite o WhatsApp com DDD, ou deixe em branco.'; return; }
+        var file = arq.files && arq.files[0];
+        salvar.disabled = true; salvar.textContent = 'Salvando…';
+        var pedido = x ? api('PATCH', '/api/admin/profissionais/' + x.id, dados).then(function(){ return x.id; })
+                       : api('POST', '/api/admin/profissionais', dados).then(function(r){ return r.id; });
+        pedido.then(function(id){
+          if(!file) return true;
+          salvar.textContent = 'Enviando a foto…';
+          return enviarFoto(file, '/api/admin/profissionais/' + id + '/foto', function(){}, !!(x && x.foto));
+        }).then(function(fotoOk){
+          return recarregar().then(function(){
+            fechar();
+            toast(fotoOk === false ? 'Dados salvos, mas a foto não foi enviada. Tente de novo em "Enviar foto".' : (x ? 'Profissional atualizado.' : dados.nome + ' agora aparece na página Profissionais.'), fotoOk === false);
+          });
+        }, function(err){ salvar.disabled = false; salvar.textContent = x ? 'Salvar' : 'Cadastrar profissional'; msg.textContent = err.message || 'Não foi possível salvar agora.'; });
+      });
+      j.appendChild(f);
+    });
   }
 
   /* Tabela de preços da sala: cada linha é "quantidade de horas → valor" */
@@ -789,7 +892,7 @@
   }
   function recarregar(){
     return api('GET', '/api/admin/dados').then(function(r){
-      st.geral = r.geral; st.salas = r.salas; st.fixos = r.fixos; st.reservas = r.reservas; st.parceiros = r.parceiros || []; st.atendimentos = r.atendimentos || [];
+      st.geral = r.geral; st.salas = r.salas; st.fixos = r.fixos; st.profissionais = r.profissionais || []; st.reservas = r.reservas; st.parceiros = r.parceiros || []; st.atendimentos = r.atendimentos || [];
       hoje = deChave(r.agora.data); HOJE = r.agora.data;
       st.carregado = true; $('estado').textContent = '';
       if(podeRedesenhar()) desenhar(); else { redesenhoPendente = true; desenharMenu(); }

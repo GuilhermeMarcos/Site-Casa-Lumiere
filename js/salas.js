@@ -73,9 +73,10 @@
   }
 
   /* ===== Carregar a agenda ===== */
-  var carregando = null;
+  var carregando = null, denovo = false;
   function carregar(){
-    if(carregando) return carregando;
+    /* Se a conta mudou enquanto a agenda carregava, carrega de novo no fim (para o desconto de parceiro aparecer) */
+    if(carregando){ denovo = true; return carregando; }
     var salaAntes = CONFIG.salas[st.sala] ? CONFIG.salas[st.sala].id : null;
     carregando = api('GET', '/api/agenda').then(function(r){
       CONFIG.salas = r.salas.map(function(s){ return { id: s.id, nome: s.nome, tipo: s.tipo, descricao: s.descricao, foto: s.foto, precos: s.precos || [], indisponivel: !s.disponivel }; });
@@ -93,7 +94,7 @@
       tudo();
     }).catch(function(err){
       $('estado').textContent = err && err.status === 503 ? 'A agenda ainda está sendo configurada. Volte em instantes.' : 'Não foi possível carregar a agenda agora. Confira a internet e recarregue a página.';
-    }).then(function(){ carregando = null; });
+    }).then(function(){ carregando = null; if(denovo){ denovo = false; carregar(); } });
     return carregando;
   }
   function carregarMinhas(){
@@ -167,13 +168,19 @@
     /* Preços pequenos no canto da foto */
     if(s.precos && s.precos.length){
       var tag = d.createElement('div'); tag.className = 'precos-sala';
-      var tit = d.createElement('span'); tit.className = 'precos-tit'; tit.textContent = 'Aluguel'; tag.appendChild(tit);
+      var parc = st.parceria && st.parceria.descontoAluguel > 0;
+      var tit = d.createElement('span'); tit.className = 'precos-tit'; tit.textContent = parc ? 'Seu preço de parceiro' : 'Aluguel'; tag.appendChild(tit);
       s.precos.slice(0, 5).forEach(function(p){
         var l = d.createElement('span'); l.className = 'precos-linha';
         var h = d.createElement('b'); h.textContent = p.horas + 'h'; l.appendChild(h);
-        l.appendChild(d.createTextNode(' ' + brl(p.valor))); tag.appendChild(l);
+        if(parc){
+          /* Parceiro vê o valor com desconto, com o valor cheio riscado ao lado */
+          var cheio = d.createElement('s'); cheio.textContent = brl(p.valor); l.appendChild(d.createTextNode(' ')); l.appendChild(cheio);
+          l.appendChild(d.createTextNode(' ' + brl(Math.round(Math.round(p.valor * 100) * (100 - st.parceria.descontoAluguel) / 100) / 100)));
+        } else l.appendChild(d.createTextNode(' ' + brl(p.valor)));
+        tag.appendChild(l);
       });
-      if(st.parceria){ var pc = d.createElement('span'); pc.className = 'precos-parc'; pc.textContent = 'Você tem ' + pctTxt(st.parceria.descontoAluguel) + ' de desconto'; tag.appendChild(pc); }
+      if(parc){ var pc = d.createElement('span'); pc.className = 'precos-parc'; pc.textContent = pctTxt(st.parceria.descontoAluguel) + ' de desconto no aluguel'; tag.appendChild(pc); }
       f.appendChild(tag);
     }
   }

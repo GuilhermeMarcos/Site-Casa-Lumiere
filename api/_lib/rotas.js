@@ -23,6 +23,7 @@ const EXPIRAR = [
   ["DELETE FROM reserva_horas h USING reservas r WHERE h.reserva_id = r.id AND r.status = 'expirada'"],
 ];
 const SQL_GERAL = ["SELECT valor FROM config WHERE chave = 'geral'"];
+const COLS_PROF = `id, nome, especialidade, registro, whatsapp, foto_url AS foto, credito_foto AS credito, ativo, ordem`;
 const SQL_SALAS = ['SELECT id, nome, tipo, descricao, foto_url AS foto, disponivel, ordem, precos FROM salas ORDER BY ordem, nome'];
 const SQL_FIXOS = ['SELECT id, sala, repete, dia_semana AS "diaSemana", a_cada_dias AS "aCadaDias", de, ate, desde::text AS desde FROM fixos ORDER BY sala, de'];
 const COLS_RESERVA = `r.id, r.sala, r.data::text AS data, r.horas, r.nome, r.especialidade, r.telefone, r.status, r.origem,
@@ -298,7 +299,9 @@ async function dadosEquipe(req) {
   const u = await exigirEquipe(req);
   const desde = somarDias(agoraLocal().data, -60);
   const umAno = somarDias(agoraLocal().data, -366);
-  const [, , g, salas, fixos, reservas, parceiros, atendimentos] = await tx([...EXPIRAR, SQL_GERAL, SQL_SALAS, SQL_FIXOS, [
+  const [, , g, salas, fixos, profissionais, reservas, parceiros, atendimentos] = await tx([...EXPIRAR, SQL_GERAL, SQL_SALAS, SQL_FIXOS, [
+    `SELECT ${COLS_PROF} FROM profissionais ORDER BY ordem, nome`,
+  ], [
     `SELECT ${COLS_RESERVA}, us.email AS "emailConta"
        FROM reservas r LEFT JOIN usuarios us ON us.id = r.usuario_id
       WHERE r.data >= $1::date ORDER BY r.data, r.horas[1]`, [desde],
@@ -310,7 +313,7 @@ async function dadosEquipe(req) {
   ], [
     `SELECT ${COLS_ATENDIMENTO} FROM atendimentos a WHERE a.data >= $1::date OR a.status = 'pendente' ORDER BY a.data DESC, a.criado_em DESC`, [umAno],
   ]]);
-  return [200, { conta: publico(u), agora: agoraLocal(), geral: geralDe(g), salas, fixos, reservas, parceiros, atendimentos }];
+  return [200, { conta: publico(u), agora: agoraLocal(), geral: geralDe(g), salas, fixos, profissionais, reservas, parceiros, atendimentos }];
 }
 
 // Valor de uma reserva lançada pela equipe: parceiro opcional e valor ajustado à mão (opcional)
@@ -448,6 +451,78 @@ async function fotoSala(req, p, c) {
   return [200, { foto: url }];
 }
 
+/* ===== Profissionais (página Profissionais e galeria do início) ===== */
+async function profissionaisPublico() {
+  const lista = await q(`SELECT id, nome, especialidade, registro, whatsapp, foto_url AS foto, credito_foto AS credito
+                           FROM profissionais WHERE ativo ORDER BY ordem, nome`);
+  return [200, { profissionais: lista }];
+}
+
+function dadosProfissional(c, parcial) {
+  const out = {};
+  if (!parcial || c.nome !== undefined) { out.nome = texto(c.nome, 80); if (out.nome.length < 2) throw new Falha(400, 'nome', 'Digite o nome do profissional.'); }
+  if (c.especialidade !== undefined) out.especialidade = texto(c.especialidade, 120);
+  if (c.registro !== undefined) out.registro = texto(c.registro, 120);
+  if (c.credito !== undefined) out.credito_foto = texto(c.credito, 120);
+  if (c.whatsapp !== undefined) {
+    const w = soDigitos(c.whatsapp);
+    if (w && (w.length < 10 || w.length > 13)) throw new Falha(400, 'whatsapp', 'Digite o WhatsApp com DDD, como (19) 99999-9999, ou deixe em branco.');
+    out.whatsapp = w;
+  }
+  if (c.ativo !== undefined) out.ativo = !!c.ativo;
+  return out;
+}
+
+async function criarProfissional(req, _p, c) {
+  await exigirEquipe(req);
+  const d = dadosProfissional(c, false);
+  const id = novoId('prof-');
+  await q(`INSERT INTO profissionais (id, nome, especialidade, registro, whatsapp, credito_foto, ativo, ordem)
+           SELECT $1, $2, $3, $4, $5, $6, $7, COALESCE(max(ordem), 0) + 1 FROM profissionais`,
+    [id, d.nome, d.especialidade || '', d.registro || '', d.whatsapp || '', d.credito_foto || '', d.ativo !== false]);
+  return [201, { id }];
+}
+
+async function editarProfissional(req, p, c) {
+  await exigirEquipe(req);
+  const d = dadosProfissional(c, true);
+  const campos = [], valores = [p.id];
+  for (const [col, v] of Object.entries(d)) { valores.push(v); campos.push(`${col} = $${valores.length}`); }
+  if (!campos.length) return [200, { ok: true }];
+  const r = await q(`UPDATE profissionais SET ${campos.join(', ')} WHERE id = $1 RETURNING id`, valores);
+  if (!r.length) throw new Falha(404, 'profissional', 'Profissional não encontrado.');
+  return [200, { ok: true }];
+}
+
+// Sobe ou desce uma posição na página (troca a ordem com o vizinho)
+async function moverProfissional(req, p, c) {
+  await exigirEquipe(req);
+  const lista = await q('SELECT id, ordem FROM profissionais ORDER BY ordem, nome');
+  const i = lista.findIndex((x) => x.id === p.id);
+  if (i < 0) throw new Falha(404, 'profissional', 'Profissional não encontrado.');
+  const j = c.para === 'cima' ? i - 1 : c.para === 'baixo' ? i + 1 : -1;
+  if (j < 0 || j >= lista.length) return [200, { ok: true }];
+  [lista[i], lista[j]] = [lista[j], lista[i]];
+  await tx(lista.map((x, k) => ['UPDATE profissionais SET ordem = $2 WHERE id = $1', [x.id, k + 1]]));
+  return [200, { ok: true }];
+}
+
+async function removerProfissional(req, p) {
+  await exigirEquipe(req);
+  const r = await q('DELETE FROM profissionais WHERE id = $1 RETURNING id', [p.id]);
+  if (!r.length) throw new Falha(404, 'profissional', 'Profissional não encontrado.');
+  return [200, { ok: true }];
+}
+
+async function fotoProfissional(req, p, c) {
+  await exigirEquipe(req);
+  const [x] = await q('SELECT id FROM profissionais WHERE id = $1', [p.id]);
+  if (!x) throw new Falha(404, 'profissional', 'Profissional não encontrado.');
+  const url = await guardarFoto(p.id, c.imagem, 'profissionais');
+  await q('UPDATE profissionais SET foto_url = $2 WHERE id = $1', [p.id, url]);
+  return [200, { foto: url }];
+}
+
 async function criarFixo(req, _p, c) {
   await exigirEquipe(req);
   const repete = ['semanal', 'aCadaDias', 'unico'].includes(c.repete) ? c.repete : null;
@@ -530,7 +605,8 @@ async function editarParceiro(req, p, c) {
   if (d.email && ehEquipe(d.email)) throw new Falha(400, 'email', 'O e-mail da equipe não pode ser parceiro.');
   const campos = [], valores = [p.id];
   for (const [col, v] of Object.entries(d)) { valores.push(v); campos.push(`${col} = $${valores.length}`); }
-  if (d.email) campos.push('usuario_confirmado = NULL'); // trocou o e-mail: a conferência antiga não vale mais
+  // Trocou o e-mail: a conferência antiga não vale mais. Mesmo e-mail (o formulário sempre manda): mantém.
+  if (d.email && c.conferirConta === undefined) campos.push(`usuario_confirmado = CASE WHEN parceiros.email = $${valores.indexOf(d.email) + 1} THEN parceiros.usuario_confirmado ELSE NULL END`);
   // "É ela mesma": a equipe confere a conta com a pessoa quando o e-mail não foi verificado por código
   if (c.conferirConta === true) campos.push('usuario_confirmado = (SELECT id FROM usuarios WHERE email = parceiros.email)');
   if (c.conferirConta === false) campos.push('usuario_confirmado = NULL');
@@ -661,6 +737,12 @@ export const ROTAS = [
   ['POST', '/api/admin/salas', criarSala],
   ['PATCH', '/api/admin/salas/:id', editarSala],
   ['POST', '/api/admin/salas/:id/foto', fotoSala],
+  ['GET', '/api/profissionais', profissionaisPublico],
+  ['POST', '/api/admin/profissionais', criarProfissional],
+  ['PATCH', '/api/admin/profissionais/:id', editarProfissional],
+  ['DELETE', '/api/admin/profissionais/:id', removerProfissional],
+  ['POST', '/api/admin/profissionais/:id/foto', fotoProfissional],
+  ['POST', '/api/admin/profissionais/:id/mover', moverProfissional],
   ['POST', '/api/admin/fixos', criarFixo],
   ['DELETE', '/api/admin/fixos/:id', removerFixo],
   ['PUT', '/api/admin/config', salvarConfig],
