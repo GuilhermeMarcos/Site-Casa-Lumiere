@@ -113,6 +113,18 @@ const TABELAS = [
     ADD COLUMN IF NOT EXISTS valor_cheio NUMERIC(10,2),
     ADD COLUMN IF NOT EXISTS desconto_pct NUMERIC(5,2),
     ADD COLUMN IF NOT EXISTS parceiro_id TEXT REFERENCES parceiros(id) ON DELETE SET NULL`,
+  `CREATE TABLE IF NOT EXISTS profissionais (
+    id TEXT PRIMARY KEY,
+    nome TEXT NOT NULL,
+    especialidade TEXT NOT NULL DEFAULT '',
+    registro TEXT NOT NULL DEFAULT '',
+    whatsapp TEXT NOT NULL DEFAULT '',
+    foto_url TEXT NOT NULL DEFAULT '',
+    credito_foto TEXT NOT NULL DEFAULT '',
+    ativo BOOLEAN NOT NULL DEFAULT true,
+    ordem INT NOT NULL DEFAULT 0,
+    criado_em TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`,
   `CREATE TABLE IF NOT EXISTS tentativas (
     email TEXT PRIMARY KEY,
     falhas INT NOT NULL DEFAULT 0,
@@ -143,6 +155,14 @@ const FIXOS = [
   ['psicologia-quinta', 'sala-06', 'semanal', 4, null, 14, 19, '2027-02-01'],
 ];
 
+// Profissionais que já estavam na página antes do cadastro pelo painel
+const PROFISSIONAIS = [
+  ['prof-vanessa', 'Vanessa Marques', 'Psicóloga Clínica', '/assets/img/profissional-3.webp', '', 1],
+  ['prof-emily', 'Emily Almeida', 'Fisioterapeuta', '/assets/img/profissional-4.webp', '', 2],
+  ['prof-adriele', 'Adriele Gomes', 'Esteticista', '/assets/img/profissional-2.webp', 'Foto: Daiane Anjos Fotografia', 3],
+  ['prof-elisangela', 'Elisangela Almeida', 'Biomédica esteta, especialista em harmonização facial', '/assets/img/profissional-1.webp', '', 4],
+];
+
 let pronto = null;
 
 export function garantirEsquema() {
@@ -154,6 +174,14 @@ export function garantirEsquema() {
 
 async function criar() {
   await tx(TABELAS.map((t) => [t]));
+  // Uma vez só (também em bancos que já existiam): coloca os profissionais que estavam na página.
+  // Se a equipe apagar todos depois, eles não voltam.
+  const semente = await q("INSERT INTO config (chave, valor) VALUES ('semente_profissionais', 'true'::jsonb) ON CONFLICT (chave) DO NOTHING RETURNING chave");
+  if (semente.length) {
+    await tx(PROFISSIONAIS.map((p) => [
+      'INSERT INTO profissionais (id, nome, especialidade, foto_url, credito_foto, ordem) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (id) DO NOTHING', p,
+    ]));
+  }
   const ja = await q("SELECT 1 FROM config WHERE chave = 'geral'");
   if (ja.length) return;
   await tx([

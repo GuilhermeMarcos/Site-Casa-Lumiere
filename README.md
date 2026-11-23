@@ -5,7 +5,8 @@ Site da Casa Lumière (Holambra-SP) com agendamento de salas por hora, conta de 
 - Site: páginas em HTML, CSS e JS na raiz.
 - Agendamento: `salas.html`. Quem tem conta pré-reserva e manda a mensagem pronta para a Agatha no WhatsApp. Sem confirmação, a pré-reserva expira em 1h30.
 - Confirmação em 1 clique: `confirmar.html?r=...`, o link que vai na mensagem do cliente para a Agatha. Só funciona com a conta da equipe.
-- Painel da equipe: `painel.html`. Confirma pré-reservas, cria reservas feitas pelo WhatsApp, altera salas, fotos, horários fixos e funcionamento.
+- Painel da equipe: `painel.html`. Confirma pré-reservas, cria reservas feitas pelo WhatsApp, altera salas, fotos, profissionais, parceiros, horários fixos e funcionamento.
+- Profissionais: a página `profissionais.html` e a galeria do início mostram quem a equipe cadastra no painel (nome, especialidade, registro, WhatsApp e foto).
 - Backend: `api/` (função da Vercel em Node), banco Postgres (Neon) e fotos no Vercel Blob.
 - Requisitos, MVP e sprints: `docs/PROJETO.md`.
 - Segurança: `docs/SEGURANCA.md` (o que o sistema faz e o que depende de você).
@@ -15,7 +16,7 @@ Site da Casa Lumière (Holambra-SP) com agendamento de salas por hora, conta de 
 O projeto já está ligado ao GitHub, então cada envio para o repositório publica sozinho. Falta ligar o banco, as fotos e três variáveis.
 
 1. **Banco de dados.** No projeto da Vercel, abra **Storage**, clique em **Create Database**, escolha **Neon (Serverless Postgres)**, plano gratuito, região **São Paulo (gru1)** se aparecer, e conecte ao projeto. A Vercel cria a variável `DATABASE_URL` sozinha. As tabelas e as salas iniciais são criadas no primeiro acesso.
-2. **Fotos das salas.** Ainda em **Storage**, **Create Database**, escolha **Blob** e conecte ao projeto. A Vercel cria `BLOB_READ_WRITE_TOKEN` sozinha.
+2. **Fotos das salas e dos profissionais.** Ainda em **Storage**, clique em **Create**, escolha **Blob**, marque o acesso **Public** e conecte ao projeto (Production e Preview). A Vercel cria `BLOB_STORE_ID` sozinha (o login é automático, por OIDC). Se aparecer a opção de criar o token de leitura e escrita, pode marcar: o site aceita os dois jeitos. Depois faça **Redeploy**.
 3. **Variáveis.** Em **Settings**, **Environment Variables**, crie (marque Production e Preview):
    - `JWT_SECRET`: uma frase longa e aleatória, com pelo menos 32 caracteres. Só você precisa saber. Se trocar, todo mundo precisa entrar de novo.
    - `ADMIN_EMAIL`: o e-mail único da equipe (Luiza e Agatha). Só esse e-mail abre o painel.
@@ -62,6 +63,7 @@ No teste local, a conta da equipe usa o e-mail `equipe@casalumiere.com.br` e o c
 | `salas` | Nome, tipo, descrição, foto, disponível e a tabela de preços (horas e valor) |
 | `fixos` | Horários fixos: toda semana, a cada 15 dias ou uma vez |
 | `reservas` | Pré-reservas e reservas, com quem, quando, a situação e o valor calculado |
+| `profissionais` | Quem aparece na página Profissionais: nome, especialidade, registro, WhatsApp, foto, ordem e se aparece no site |
 | `parceiros` | Quem tem desconto no aluguel e repassa uma porcentagem dos atendimentos |
 | `atendimentos` | Atendimentos lançados pela equipe, com o repasse e se já foi recebido |
 | `reserva_horas` | Uma linha por hora ocupada. A chave sala + dia + hora impede reserva dupla |

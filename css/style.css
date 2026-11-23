@@ -261,6 +261,8 @@ html.js .comodo.ativo,html.js .comodo.visto{opacity:1}
 .esp{font-weight:500;color:var(--muted);line-height:1.5}
 .gente .btn{padding:1em 1.5em;font-size:.75rem}
 .credito{font-size:.8125rem;color:var(--muted);font-style:italic}
+.arco.vazio{background:var(--walnut)}
+.arco.vazio img{object-fit:contain !important;padding:28%;opacity:.85}
 
 /* Faça Parte */
 .salas li{display:flex;align-items:baseline;gap:1rem;padding-block:1.15rem;border-top:1px solid var(--line);font-weight:600;font-size:1.125rem}
