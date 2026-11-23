@@ -125,13 +125,8 @@ const TABELAS = [
     ordem INT NOT NULL DEFAULT 0,
     criado_em TIMESTAMPTZ NOT NULL DEFAULT now()
   )`,
-  // Verificação em duas etapas da equipe (segredo cifrado) e códigos de recuperação (só o hash)
-  `ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS totp_segredo TEXT,
-    ADD COLUMN IF NOT EXISTS totp_pendente TEXT,
-    ADD COLUMN IF NOT EXISTS totp_ultimo BIGINT NOT NULL DEFAULT 0,
-    ADD COLUMN IF NOT EXISTS totp_falhas INT NOT NULL DEFAULT 0,
-    ADD COLUMN IF NOT EXISTS totp_bloqueado_ate TIMESTAMPTZ,
-    ADD COLUMN IF NOT EXISTS recuperacao TEXT[] NOT NULL DEFAULT '{}'`,
+  // Código de 6 números por e-mail também para a segunda etapa da equipe ('entrar'); quem valida a finalidade é o servidor
+  'ALTER TABLE codigos DROP CONSTRAINT IF EXISTS codigos_finalidade_check',
   // Registro de entradas na conta da equipe (90 dias), para ver se alguém estranho tentou entrar
   `CREATE TABLE IF NOT EXISTS acessos (
     id BIGSERIAL PRIMARY KEY,

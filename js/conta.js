@@ -197,7 +197,7 @@
     }).catch(function(err){
       ocupado(f, false);
       /* Conta da equipe com verificação em duas etapas: o código do aplicativo é pedido no painel */
-      if(err.erro === 'precisa_2fa'){ msgForm('e-msg', 'Conta da equipe: abrindo o painel, onde vocês digitam o código do aplicativo…'); setTimeout(function(){ location.href = 'painel.html'; }, 1200); return; }
+      if(err.erro === 'precisa_codigo' || err.erro === 'precisa_codigo_equipe'){ msgForm('e-msg', 'Conta da equipe: abrindo o painel para digitar o código…'); setTimeout(function(){ location.href = 'painel.html'; }, 1200); return; }
       msgForm('e-msg', err.message);
     });
   });
@@ -303,11 +303,8 @@
     var em = $('r-email').value, cod = $('r-codigo').value.trim(), nova = $('r-nova').value;
     if(!checar([['r-email', emailOk(em), 'Digite o e-mail da equipe.'], ['r-codigo', !!cod, 'Digite o código da equipe.'], ['r-nova', nova.length >= 12, 'A senha da equipe precisa ter pelo menos 12 caracteres.']])) return;
     var f = this; ocupado(f, true, 'Salvando…');
-    var corpoR = {email: em.trim(), codigo: cod, senhaNova: nova};
-    var seg = $('r-2fa') ? $('r-2fa').value.trim() : '';
-    if(/^\d{6}$/.test(seg)) corpoR.codigo2fa = seg; else if(seg) corpoR.recuperacao = seg;
-    api('POST', '/api/auth/redefinir-equipe', corpoR).then(function(){
-      ocupado(f, false); $('r-codigo').value = ''; $('r-nova').value = ''; if($('r-2fa')) $('r-2fa').value = '';
+    api('POST', '/api/auth/redefinir-equipe', {email: em.trim(), codigo: cod, senhaNova: nova}).then(function(){
+      ocupado(f, false); $('r-codigo').value = ''; $('r-nova').value = '';
       aba('entrar'); $('e-email').value = em.trim(); $('e-senha').focus();
       aviso('Senha nova criada. Agora é só entrar.');
     }).catch(function(err){ ocupado(f, false); msgForm('r-msg', err.message); });

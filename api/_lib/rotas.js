@@ -4,11 +4,10 @@ import { q, tx, violouUnico } from './db.js';
 import { Falha, texto } from './http.js';
 import {
   gerarHash, conferirSenha, cookieSessao, cookieSair, publico, usuarioAtual, exigirLogin, exigirEquipe,
-  ehEquipe, emailsEquipe, checarBloqueio, registrarFalha, limparFalhas, codigoEquipeConfere, codigoEquipeFraco, checarSenhaNova, limitar,
+  ehEquipe, checarBloqueio, registrarFalha, limparFalhas, codigoEquipeConfere, codigoEquipeFraco, checarSenhaNova, limitar, exigir2fa,
 } from './auth.js';
 import { ipDe, ipLimite } from './http.js';
-import { correioAtivo, enviarEmail, emailCodigo, emailJaTemConta, emailNovoAcesso } from './correio.js';
-import { exigir2fa, conferirCodigo, novoSegredo, uriAutenticador, cifrar, decifrar, novosCodigosRecuperacao, hashRecuperacao } from './doisfatores.js';
+import { correioAtivo, enviarEmail, emailCodigo, emailJaTemConta } from './correio.js';
 import { criarCodigo, usarCodigo } from './codigos.js';
 import { agoraLocal, dataValida, diaSemana, somarDias, fixoOcupa, horasValidas } from './agenda.js';
 import { GERAL_PADRAO } from './esquema.js';
@@ -147,7 +146,7 @@ async function cadastro(req, _p, c) {
     if (violouUnico(e)) throw new Falha(409, 'email_existe', 'Já existe uma conta com este e-mail. Use "Entrar".');
     throw e;
   }
-  return [201, { conta: publico({ id, nome, email, telefone, especialidade }) }, { 'Set-Cookie': cookieSessao(req, id, 0, c.lembrar !== false) }];
+  return [201, { conta: publico({ id, nome, email, telefone, especialidade }) }, { 'Set-Cookie': cookieSessao(req, id, 0, c.lembrar !== false, ehEquipe(email)) }];
 }
 
 async function entrar(req, _p, c) {
@@ -155,8 +154,7 @@ async function entrar(req, _p, c) {
   if (!email || !senha) throw new Falha(400, 'campos', 'Digite o e-mail e a senha.');
   await limitar('entrar|' + ipLimite(req), 40, 900);
   await checarBloqueio(email, req);
-  const [u] = await q(`SELECT id, nome, email, telefone, especialidade, senha_hash, sessao_versao, totp_segredo, totp_ultimo, totp_bloqueado_ate
-                         FROM usuarios WHERE email = $1`, [email]);
+  const [u] = await q('SELECT id, nome, email, telefone, especialidade, senha_hash, sessao_versao FROM usuarios WHERE email = $1', [email]);
   const equipe = ehEquipe(email);
   if (!(await conferirSenha(senha, u && u.senha_hash)) || !u) {
     await registrarFalha(email, req);
@@ -164,20 +162,10 @@ async function entrar(req, _p, c) {
     throw new Falha(401, 'senha', 'E-mail ou senha incorretos.');
   }
   await limparFalhas(email, req);
-  let mfa = false, extra = {};
-  if (equipe && exigir2fa() && u.totp_segredo) {
-    const jeito = await segundoFator(req, u, c);
-    mfa = true;
-    if (jeito === 'recuperacao') {
-      const [r] = await q('SELECT cardinality(recuperacao) AS n FROM usuarios WHERE id = $1', [u.id]);
-      extra = { recuperacoesRestantes: r.n };
-    }
-  }
-  if (equipe) {
-    await registrarAcesso(req, u.id, mfa ? 'entrou' : 'entrou_sem_2fa');
-    avisarAcesso(req);
-  }
-  return [200, { conta: publico(u), ...extra }, { 'Set-Cookie': cookieSessao(req, u.id, u.sessao_versao, !!c.lembrar, mfa) }];
+  const mfa = equipe && exigir2fa();
+  if (mfa) await segundaEtapa(req, u, c);
+  if (equipe) await registrarAcesso(req, u.id, 'entrou');
+  return [200, { conta: publico(u) }, { 'Set-Cookie': cookieSessao(req, u.id, u.sessao_versao, !!c.lembrar, mfa) }];
 }
 
 /* ===== Segurança da conta da equipe ===== */
@@ -199,87 +187,31 @@ async function registrarAcesso(req, usuarioId, resultado) {
   } catch (e) { console.error('acessos:', e && e.message); }
 }
 
-// E-mail para a equipe a cada entrada (quando o e-mail do site está ligado). Não atrasa nem impede a entrada.
-function avisarAcesso(req) {
-  if (!correioAtivo()) return;
-  const h = req.headers || {};
-  let cidade = '';
-  try { cidade = decodeURIComponent(String(h['x-vercel-ip-city'] || '')); } catch { /* ignora */ }
-  const quando = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Sao_Paulo' }).format(new Date());
-  const local = [cidade, h['x-vercel-ip-country-region'], h['x-vercel-ip-country']].filter(Boolean).join(', ');
-  const msg = emailNovoAcesso({ quando, local, aparelho: texto(h['user-agent'], 160) });
-  for (const para of emailsEquipe()) enviarEmail({ para, ...msg }).catch(() => {});
-}
+const mascarar = (e) => { const [n, d] = String(e).split('@'); return (n.length <= 2 ? n[0] + '*' : n.slice(0, 2) + '*'.repeat(Math.min(6, n.length - 2))) + '@' + d; };
 
-/* Código do aplicativo (ou um código de recuperação). 5 erros seguidos travam a verificação por 15 minutos,
-   em qualquer aparelho: chutar 1 milhão de combinações fica impossível. */
-async function segundoFator(req, u, c) {
-  if (u.totp_bloqueado_ate && new Date(u.totp_bloqueado_ate) > new Date()) {
-    throw new Falha(429, 'bloqueado_2fa', 'Muitos códigos errados. Espere 15 minutos e tente de novo.');
+/* Segunda etapa da equipe, depois da senha certa:
+   com o e-mail do site ligado, um código de 6 números vai para o e-mail da equipe (vale 10 minutos, 5 tentativas, uso único);
+   enquanto o e-mail não estiver ligado, pede o código da equipe. */
+async function segundaEtapa(req, u, c) {
+  if (correioAtivo()) {
+    if (!String(c.codigoEmail || '').trim()) {
+      try {
+        const codigo = await criarCodigo(u.email, 'entrar');
+        await enviarEmail({ para: u.email, ...emailCodigo('entrar', codigo) });
+      } catch (e) {
+        if (!(e instanceof Falha && e.status === 429)) throw e; // pediu de novo em menos de 1 minuto: o código anterior ainda vale
+      }
+      throw new Falha(401, 'precisa_codigo', `Enviamos um código de 6 números para ${mascarar(u.email)}. Confira também o spam.`);
+    }
+    try { await usarCodigo(u.email, 'entrar', c.codigoEmail); } catch (e) { await registrarAcesso(req, u.id, 'codigo_errado'); throw e; }
+    return;
   }
-  const codigo = String(c.codigo2fa || '').trim(), rec = String(c.recuperacao || '').trim();
-  if (!codigo && !rec) throw new Falha(401, 'precisa_2fa', 'Digite o código de 6 números do aplicativo autenticador.');
-  if (codigo) {
-    const seg = decifrar(u.totp_segredo);
-    const passo = seg ? conferirCodigo(seg, codigo, u.totp_ultimo) : null;
-    // A condição no UPDATE impede que o mesmo código seja usado duas vezes ao mesmo tempo
-    if (passo && (await q('UPDATE usuarios SET totp_ultimo = $2, totp_falhas = 0, totp_bloqueado_ate = NULL WHERE id = $1 AND totp_ultimo < $2 RETURNING id', [u.id, passo])).length) return 'codigo';
-  } else {
-    const h = hashRecuperacao(rec);
-    if (rec.replace(/[^a-z0-9]/gi, '').length >= 8 && (await q('UPDATE usuarios SET recuperacao = array_remove(recuperacao, $2), totp_falhas = 0, totp_bloqueado_ate = NULL WHERE id = $1 AND $2 = ANY(recuperacao) RETURNING id', [u.id, h])).length) return 'recuperacao';
+  if (!String(c.codigoEquipe || '').trim()) throw new Falha(401, 'precisa_codigo_equipe', 'Digite também o código da equipe.');
+  if (!codigoEquipeConfere(c.codigoEquipe)) {
+    await registrarFalha(u.email, req);
+    await registrarAcesso(req, u.id, 'codigo_errado');
+    throw new Falha(401, 'codigo_equipe', codigoEquipeFraco() ? 'O código da equipe na Vercel é fraco e foi desligado. Troque CODIGO_EQUIPE por um com pelo menos 10 caracteres e faça Redeploy.' : 'O código da equipe não confere.');
   }
-  await q(`UPDATE usuarios SET
-      totp_falhas = CASE WHEN totp_falhas + 1 >= 5 THEN 0 ELSE totp_falhas + 1 END,
-      totp_bloqueado_ate = CASE WHEN totp_falhas + 1 >= 5 THEN now() + interval '15 minutes' ELSE totp_bloqueado_ate END
-    WHERE id = $1`, [u.id]);
-  await registrarAcesso(req, u.id, 'codigo_errado');
-  throw new Falha(401, 'codigo_2fa', codigo ? 'O código não confere. Confira o aplicativo e digite o código que está aparecendo agora.' : 'Esse código de recuperação não vale (ou já foi usado).');
-}
-
-async function situacao2fa(req) {
-  const u = await exigirEquipe(req, { configurando: true });
-  const [r] = await q('SELECT cardinality(recuperacao) AS n FROM usuarios WHERE id = $1', [u.id]);
-  return [200, { ativo: !!u.totp_ativo, exigido: exigir2fa(), recuperacoesRestantes: r.n, codigoEquipeFraco: codigoEquipeFraco() }];
-}
-
-// Primeiro passo para ligar (ou trocar de celular): pede o código da equipe e devolve a chave para o aplicativo
-async function iniciar2fa(req, _p, c) {
-  const u = await exigirEquipe(req, { configurando: true });
-  await limitar('iniciar2fa|' + u.id, 10, 3600);
-  if (codigoEquipeFraco()) throw new Falha(503, 'codigo_fraco', 'O código da equipe configurado na Vercel é fraco. Troque CODIGO_EQUIPE por um com pelo menos 10 caracteres, faça Redeploy e tente de novo.');
-  await checarBloqueio(u.email, req);
-  if (!codigoEquipeConfere(c.codigoEquipe)) { await registrarFalha(u.email, req); throw new Falha(403, 'codigo_equipe', 'O código da equipe não confere.'); }
-  await limparFalhas(u.email, req);
-  const segredo = novoSegredo();
-  await q('UPDATE usuarios SET totp_pendente = $2 WHERE id = $1', [u.id, cifrar(segredo)]);
-  return [200, { segredo, uri: uriAutenticador(segredo, u.email) }];
-}
-
-// Segundo passo: confere o primeiro código do aplicativo, liga a verificação e desconecta os outros aparelhos
-async function ativar2fa(req, _p, c) {
-  const u = await exigirEquipe(req, { configurando: true });
-  await limitar('ativar2fa|' + u.id, 10, 900);
-  const [x] = await q('SELECT totp_pendente FROM usuarios WHERE id = $1', [u.id]);
-  const seg = x && decifrar(x.totp_pendente);
-  if (!seg) throw new Falha(400, 'sem_pendente', 'Comece de novo: digite o código da equipe para gerar o QR code.');
-  const passo = conferirCodigo(seg, c.codigo, 0);
-  if (!passo) throw new Falha(400, 'codigo_2fa', 'O código não confere. Digite o código que está aparecendo agora no aplicativo.');
-  const { codigos, hashes } = novosCodigosRecuperacao();
-  const [r] = await q(`UPDATE usuarios SET totp_segredo = totp_pendente, totp_pendente = NULL, totp_ultimo = $2, totp_falhas = 0,
-      totp_bloqueado_ate = NULL, recuperacao = $3, sessao_versao = sessao_versao + 1 WHERE id = $1 RETURNING sessao_versao`, [u.id, passo, hashes]);
-  await registrarAcesso(req, u.id, 'ativou_2fa');
-  return [200, { codigos }, { 'Set-Cookie': cookieSessao(req, u.id, r.sessao_versao, true, true) }];
-}
-
-// Códigos de recuperação novos (os antigos deixam de valer). Pede o código atual do aplicativo.
-async function novosCodigos2fa(req, _p, c) {
-  const u = await exigirEquipe(req);
-  await limitar('novos-codigos|' + u.id, 10, 3600);
-  const [x] = await q('SELECT id, totp_segredo, totp_ultimo, totp_bloqueado_ate FROM usuarios WHERE id = $1', [u.id]);
-  await segundoFator(req, x, { codigo2fa: c.codigo2fa });
-  const { codigos, hashes } = novosCodigosRecuperacao();
-  await q('UPDATE usuarios SET recuperacao = $2 WHERE id = $1', [u.id, hashes]);
-  return [200, { codigos }];
 }
 
 // Desconecta a conta da equipe de todos os aparelhos, menos deste
@@ -362,8 +294,6 @@ async function redefinirEquipe(req, _p, c) {
   await checarBloqueio(email, req);
   if (!codigoEquipeConfere(c.codigo)) { await registrarFalha(email, req); throw new Falha(403, 'codigo_equipe', codigoEquipeFraco() ? 'O código da equipe na Vercel é fraco e foi desligado. Troque CODIGO_EQUIPE por um com pelo menos 10 caracteres e faça Redeploy.' : 'O código da equipe não confere.'); }
   checarSenhaNova(nova, email);
-  const [conta] = await q('SELECT id, totp_segredo, totp_ultimo, totp_bloqueado_ate FROM usuarios WHERE email = $1', [email]);
-  if (conta && conta.totp_segredo && exigir2fa()) await segundoFator(req, conta, c);
   const r = await q('UPDATE usuarios SET senha_hash = $2, sessao_versao = sessao_versao + 1 WHERE email = $1 RETURNING id', [email, await gerarHash(nova)]);
   if (!r.length) throw new Falha(404, 'sem_conta', 'Ainda não existe conta com este e-mail. Use "Criar conta".');
   await limparFalhas(email, req);
@@ -435,7 +365,7 @@ async function dadosEquipe(req) {
   const u = await exigirEquipe(req);
   const desde = somarDias(agoraLocal().data, -60);
   const umAno = somarDias(agoraLocal().data, -366);
-  const [, , g, salas, fixos, profissionais, reservas, parceiros, atendimentos, acessos, sit] = await tx([...EXPIRAR, SQL_GERAL, SQL_SALAS, SQL_FIXOS, [
+  const [, , g, salas, fixos, profissionais, reservas, parceiros, atendimentos, acessos] = await tx([...EXPIRAR, SQL_GERAL, SQL_SALAS, SQL_FIXOS, [
     `SELECT ${COLS_PROF} FROM profissionais ORDER BY ordem, nome`,
   ], [
     `SELECT ${COLS_RESERVA}, us.email AS "emailConta"
@@ -450,10 +380,8 @@ async function dadosEquipe(req) {
     `SELECT ${COLS_ATENDIMENTO} FROM atendimentos a WHERE a.data >= $1::date OR a.status = 'pendente' ORDER BY a.data DESC, a.criado_em DESC`, [umAno],
   ], [
     `SELECT quando, ip, local, aparelho, resultado FROM acessos WHERE usuario_id = $1 ORDER BY quando DESC LIMIT 25`, [u.id],
-  ], [
-    'SELECT cardinality(recuperacao) AS n, (totp_segredo IS NOT NULL) AS ativo FROM usuarios WHERE id = $1', [u.id],
   ]]);
-  const seguranca = { acessos, doisFatores: { ativo: !!(sit[0] && sit[0].ativo), recuperacoesRestantes: sit[0] ? sit[0].n : 0, exigido: exigir2fa() } };
+  const seguranca = { acessos, segundaEtapa: !exigir2fa() ? 'desligada' : correioAtivo() ? 'email' : 'codigo_equipe', email: mascarar(u.email) };
   return [200, { conta: publico(u), agora: agoraLocal(), geral: geralDe(g), salas, fixos, profissionais, reservas, parceiros, atendimentos, seguranca }];
 }
 
@@ -880,10 +808,6 @@ export const ROTAS = [
   ['PATCH', '/api/admin/salas/:id', editarSala],
   ['POST', '/api/admin/salas/:id/foto', fotoSala],
   ['GET', '/api/profissionais', profissionaisPublico],
-  ['GET', '/api/admin/2fa', situacao2fa],
-  ['POST', '/api/admin/2fa/iniciar', iniciar2fa],
-  ['POST', '/api/admin/2fa/ativar', ativar2fa],
-  ['POST', '/api/admin/2fa/novos-codigos', novosCodigos2fa],
   ['POST', '/api/admin/sair-todos', sairDeTodos],
   ['POST', '/api/admin/profissionais', criarProfissional],
   ['PATCH', '/api/admin/profissionais/:id', editarProfissional],

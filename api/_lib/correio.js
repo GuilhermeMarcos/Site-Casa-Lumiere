@@ -71,6 +71,14 @@ const caixaCodigo = (codigo) => `<p style="margin:0 0 8px;font-size:15px;line-he
 <div style="margin:18px 0 8px;padding:18px;border-radius:14px;background:#2E1F16;text-align:center;font-family:'Courier New',monospace;font-size:34px;letter-spacing:.35em;color:#F6DC98;font-weight:700">${esc(codigo)}</div>`;
 
 export function emailCodigo(finalidade, codigo) {
+  if (finalidade === 'entrar') {
+    return {
+      assunto: `${codigo} é o código para entrar no painel da Casa Lumière`,
+      html: moldura('Código para entrar no painel', '<p style="margin:0 0 6px;font-size:15px;line-height:1.6">Alguém digitou a senha da equipe e está entrando no painel. Se foi vocês, use o código abaixo.</p>' + caixaCodigo(codigo) +
+        '<p style="margin:14px 0 0;font-size:14px;line-height:1.6"><strong>Não foram vocês?</strong> Não passem o código para ninguém e troquem a senha da equipe: alguém sabe a senha atual.</p>'),
+      texto: `Código para entrar no painel: ${codigo}\nVale por 10 minutos.\n\nNão foram vocês? Não passem o código para ninguém e troquem a senha da equipe: alguém sabe a senha atual.`,
+    };
+  }
   const cadastro = finalidade === 'cadastro';
   const titulo = cadastro ? 'Confirme o seu e-mail' : 'Crie uma senha nova';
   return {
@@ -88,17 +96,3 @@ export function emailJaTemConta() {
   };
 }
 
-const escapar = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-
-// Aviso para a equipe a cada entrada no painel: se não foi ela, dá para agir na hora
-export function emailNovoAcesso({ quando, local, aparelho }) {
-  const linhas = [['Quando', quando], ['Onde (aproximado)', local || 'não identificado'], ['Aparelho', aparelho || 'não identificado']];
-  return {
-    assunto: 'Novo acesso ao painel da Casa Lumière',
-    html: moldura('Alguém entrou no painel', '<p style="margin:0 0 12px;font-size:15px;line-height:1.6">A conta da equipe acabou de entrar no painel.</p>' +
-      linhas.map(([k, v]) => `<p style="margin:0 0 6px;font-size:14px;line-height:1.5"><strong>${escapar(k)}:</strong> ${escapar(v)}</p>`).join('') +
-      '<p style="margin:14px 0 0;font-size:14px;line-height:1.6">Se não foi vocês: troquem a senha e, no painel, em Segurança, toquem em "Sair de todos os aparelhos".</p>'),
-    texto: 'A conta da equipe acabou de entrar no painel.\n\n' + linhas.map(([k, v]) => `${k}: ${v}`).join('\n') +
-      '\n\nSe não foi vocês: troquem a senha e, no painel, em Segurança, toquem em "Sair de todos os aparelhos".',
-  };
-}

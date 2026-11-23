@@ -2,7 +2,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import { preparar, ligar2fa } from './preparar.mjs';
+import { preparar } from './preparar.mjs';
 import handler from '../api/index.js';
 
 let servidor, base;
@@ -33,7 +33,6 @@ const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJA
 
 test('preparação: equipe e cliente', async () => {
   assert.equal((await equipe('POST', '/api/auth/cadastro', { nome: 'Luiza e Agatha', email: 'equipe@casalumiere.com.br', telefone: '19992487347', senha: 'Casa-Forte-2026', codigoEquipe: 'lumiere' })).status, 201);
-  await ligar2fa(equipe);
   assert.equal((await comum('POST', '/api/auth/cadastro', { nome: 'Cliente Comum', email: 'comum@exemplo.com', telefone: '19990000001', senha: 'Senha-Comum-1' })).status, 201);
 });
 
