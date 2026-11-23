@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "node dev/servidor.mjs",
-    "test": "node --test dev/testes.mjs dev/ataques.mjs dev/codigos.mjs dev/parceiros.mjs dev/profissionais.mjs"
+    "test": "node --test dev/testes.mjs dev/ataques.mjs dev/codigos.mjs dev/parceiros.mjs dev/profissionais.mjs dev/seguranca.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.0",

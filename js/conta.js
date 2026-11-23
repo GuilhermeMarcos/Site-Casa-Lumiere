@@ -194,7 +194,12 @@
     api('POST', '/api/auth/entrar', {email: em.trim(), senha: se, lembrar: $('e-lembrar').checked}).then(function(r){
       ocupado(f, false); $('e-senha').value = '';
       entrou(r.conta, r.conta.equipe ? 'Você entrou como equipe da Casa. O painel está no menu da sua conta.' : 'Bem-vindo(a) de volta, ' + primeiro(r.conta.nome) + '.');
-    }).catch(function(err){ ocupado(f, false); msgForm('e-msg', err.message); });
+    }).catch(function(err){
+      ocupado(f, false);
+      /* Conta da equipe com verificação em duas etapas: o código do aplicativo é pedido no painel */
+      if(err.erro === 'precisa_2fa'){ msgForm('e-msg', 'Conta da equipe: abrindo o painel, onde vocês digitam o código do aplicativo…'); setTimeout(function(){ location.href = 'painel.html'; }, 1200); return; }
+      msgForm('e-msg', err.message);
+    });
   });
 
   /* ===== Código por e-mail ===== */
@@ -204,7 +209,7 @@
     (function passo(){ if(!botao.isConnected) return; if(s <= 0){ botao.disabled = false; botao.textContent = rot; return; } botao.textContent = rot + ' (' + s + 's)'; s--; setTimeout(passo, 1000); })();
   }
   function pedirCodigo(email, finalidade, botaoReenviar){
-    return api('POST', '/api/auth/codigo', {email: email, finalidade: finalidade}).then(function(){ contarReenvio(botaoReenviar); });
+    return api('POST', '/api/auth/codigo', {email: email, finalidade: finalidade, site: $('cr-site') ? $('cr-site').value : ''}).then(function(){ contarReenvio(botaoReenviar); });
   }
   var etapaCriar = 1;
   function mudarEtapaCriar(n){
@@ -238,7 +243,7 @@
     }
     if(emailAtivo && !checar([['cr-cod', $('cr-cod').value.length === 6, 'Digite os 6 números do e-mail.']])) return;
     ocupado(f, true, 'Criando conta…');
-    var corpo = {nome: nome, email: em.trim(), telefone: tel, especialidade: $('cr-esp').value.trim(), senha: se, lembrar: true, codigo: $('cr-cod').value};
+    var corpo = {nome: nome, email: em.trim(), telefone: tel, especialidade: $('cr-esp').value.trim(), senha: se, lembrar: true, codigo: $('cr-cod').value, site: $('cr-site') ? $('cr-site').value : ''};
     if(!$('cr-codigo-wrap').hidden) corpo.codigoEquipe = $('cr-codigo').value.trim();
     api('POST', '/api/auth/cadastro', corpo).then(function(r){
       ocupado(f, false); $('cr-senha').value = ''; $('cr-codigo').value = ''; $('cr-codigo-wrap').hidden = true; $('cr-cod').value = ''; mudarEtapaCriar(1);
@@ -296,10 +301,13 @@
   $('f-equipe-senha').addEventListener('submit', function(e){
     e.preventDefault(); msgForm('r-msg', '');
     var em = $('r-email').value, cod = $('r-codigo').value.trim(), nova = $('r-nova').value;
-    if(!checar([['r-email', emailOk(em), 'Digite o e-mail da equipe.'], ['r-codigo', !!cod, 'Digite o código da equipe.'], ['r-nova', nova.length >= 8, 'A senha nova precisa ter pelo menos 8 caracteres.']])) return;
+    if(!checar([['r-email', emailOk(em), 'Digite o e-mail da equipe.'], ['r-codigo', !!cod, 'Digite o código da equipe.'], ['r-nova', nova.length >= 12, 'A senha da equipe precisa ter pelo menos 12 caracteres.']])) return;
     var f = this; ocupado(f, true, 'Salvando…');
-    api('POST', '/api/auth/redefinir-equipe', {email: em.trim(), codigo: cod, senhaNova: nova}).then(function(){
-      ocupado(f, false); $('r-codigo').value = ''; $('r-nova').value = '';
+    var corpoR = {email: em.trim(), codigo: cod, senhaNova: nova};
+    var seg = $('r-2fa') ? $('r-2fa').value.trim() : '';
+    if(/^\d{6}$/.test(seg)) corpoR.codigo2fa = seg; else if(seg) corpoR.recuperacao = seg;
+    api('POST', '/api/auth/redefinir-equipe', corpoR).then(function(){
+      ocupado(f, false); $('r-codigo').value = ''; $('r-nova').value = ''; if($('r-2fa')) $('r-2fa').value = '';
       aba('entrar'); $('e-email').value = em.trim(); $('e-senha').focus();
       aviso('Senha nova criada. Agora é só entrar.');
     }).catch(function(err){ ocupado(f, false); msgForm('r-msg', err.message); });

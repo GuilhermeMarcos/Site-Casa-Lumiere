@@ -111,3 +111,6 @@
 .gaveta input[readonly]{opacity:.7}
 #f-esqueci{padding:1.5rem}
 #f-esqueci form{padding:0}
+
+/* Campo isca contra robôs: fora da tela para pessoas, mas presente para quem preenche tudo */
+.isca{position:absolute !important;left:-10000px !important;top:auto;width:1px;height:1px;overflow:hidden}

@@ -37,3 +37,21 @@ export async function preparar({ pastaBanco, pastaUploads, correio = false, most
   });
   return pg;
 }
+
+// Liga a verificação em duas etapas da conta da equipe nos testes (como as meninas fazem pelo painel)
+export async function ligar2fa(api) {
+  const { codigoNoPasso, passoAtual } = await import('../api/_lib/doisfatores.js');
+  const i = await api('POST', '/api/admin/2fa/iniciar', { codigoEquipe: process.env.CODIGO_EQUIPE });
+  if (i.status !== 200) throw new Error('iniciar 2fa: ' + i.status + ' ' + JSON.stringify(i.dados));
+  const a = await api('POST', '/api/admin/2fa/ativar', { codigo: codigoNoPasso(i.dados.segredo, passoAtual()) });
+  if (a.status !== 200) throw new Error('ativar 2fa: ' + a.status + ' ' + JSON.stringify(a.dados));
+  return { segredo: i.dados.segredo, codigos: a.dados.codigos };
+}
+// Código do aplicativo: cada chamada adianta o relógio em 30 segundos (cada código só vale uma vez)
+let desvio = 0;
+export async function codigoApp(segredo) {
+  const { codigoNoPasso, passoAtual, usarRelogio } = await import('../api/_lib/doisfatores.js');
+  desvio += 30000;
+  usarRelogio(() => Date.now() + desvio);
+  return codigoNoPasso(segredo, passoAtual());
+}

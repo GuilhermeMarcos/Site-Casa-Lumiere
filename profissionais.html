@@ -166,6 +166,7 @@
       <div class="c-campo"><label for="cr-esp">Especialidade <span>(opcional)</span></label><input id="cr-esp" placeholder="Ex.: Psicologia"></div>
       <div class="c-campo"><label for="cr-senha">Senha</label><div class="caixa-in"><input id="cr-senha" type="password" autocomplete="new-password" placeholder="Pelo menos 8 caracteres"><button class="ver" type="button" aria-controls="cr-senha" aria-pressed="false">Mostrar</button></div><p class="msg" id="cr-senha-msg" hidden></p></div>
       <div class="c-campo" id="cr-codigo-wrap" hidden><label for="cr-codigo">Código da equipe</label><input id="cr-codigo" autocomplete="off"><p class="msg" id="cr-codigo-msg" hidden></p></div>
+      <div class="isca" aria-hidden="true"><label for="cr-site">Deixe este campo em branco</label><input id="cr-site" name="site" tabindex="-1" autocomplete="off"></div>
       <div class="c-linha"><label for="cr-aceite"><input id="cr-aceite" type="checkbox"><span>Li e concordo com os <a href="termos-privacidade.html" target="_blank">Termos e a Política de Privacidade</a>.</span></label></div>
       <p class="c-campo"><span class="msg" id="cr-aceite-msg" hidden>Marque a caixa para continuar.</span></p>
       <div class="cod-email" id="cr-etapa2" hidden>
@@ -199,6 +200,7 @@
           <div class="c-campo"><label for="r-email">E-mail da equipe</label><input id="r-email" type="email" autocomplete="username" inputmode="email"><p class="msg" id="r-email-msg" hidden></p></div>
           <div class="c-campo"><label for="r-codigo">Código da equipe</label><input id="r-codigo" autocomplete="off"><p class="msg" id="r-codigo-msg" hidden></p></div>
           <div class="c-campo"><label for="r-nova">Senha nova</label><div class="caixa-in"><input id="r-nova" type="password" autocomplete="new-password" placeholder="Pelo menos 8 caracteres"><button class="ver" type="button" aria-controls="r-nova" aria-pressed="false">Mostrar</button></div><p class="msg" id="r-nova-msg" hidden></p></div>
+          <div class="c-campo"><label for="r-2fa">Código do aplicativo autenticador</label><input id="r-2fa" inputmode="numeric" autocomplete="one-time-code" maxlength="11" placeholder="000000 ou código de recuperação"><p class="msg" id="r-2fa-msg" hidden></p></div>
           <p class="msg-form" id="r-msg" role="alert" hidden></p>
           <button class="btn btn-linha" type="submit">Criar senha nova</button>
         </details>

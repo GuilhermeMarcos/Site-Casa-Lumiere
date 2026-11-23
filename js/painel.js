@@ -7,11 +7,12 @@
     reservas: 'M5 5h14v15H5zM5 9h14M9 3v4M15 3v4',
     salas: 'M6 20V10a6 6 0 0 1 12 0v10M4 20h16M14 14v1',
     fixos: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2',
+    seguranca: 'M12 3l7 3v5c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6zM9 12l2 2 4-4',
     funcionamento: 'M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1M15 4v4M9 10v4M17 16v4',
     profissionais: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0',
     parceiros: 'M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM16 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM2 20a6 6 0 0 1 12 0M10 20a6 6 0 0 1 12 0'
   };
-  var SECOES = [['inicio', 'Início'], ['reservas', 'Reservas'], ['salas', 'Salas e valores'], ['profissionais', 'Profissionais'], ['parceiros', 'Parceiros'], ['fixos', 'Horários fixos'], ['funcionamento', 'Funcionamento']];
+  var SECOES = [['inicio', 'Início'], ['reservas', 'Reservas'], ['salas', 'Salas e valores'], ['profissionais', 'Profissionais'], ['parceiros', 'Parceiros'], ['fixos', 'Horários fixos'], ['funcionamento', 'Funcionamento'], ['seguranca', 'Segurança']];
   var DIAS_SEM = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
   var d = document, $ = function(id){ return d.getElementById(id); };
   function el(tag, cls, txt){ var e = d.createElement(tag); if(cls) e.className = cls; if(txt != null) e.textContent = txt; return e; }
@@ -131,12 +132,13 @@
     var titulo = $('titulo'), sub = $('sub');
     if(st.acesso === false){ titulo.innerHTML = 'Painel da <em>Casa</em>'; sub.textContent = ''; area.appendChild(semAcesso()); return; }
     if(st.acesso === null){ titulo.innerHTML = 'Painel da <em>Casa</em>'; sub.textContent = 'Entre com o e-mail da equipe.'; area.appendChild(telaLogin()); return; }
+    if(st.acesso === 'configurar'){ $('estado').textContent = ''; titulo.innerHTML = 'Proteja o <em>painel</em>'; sub.textContent = 'Falta um passo: ligar a verificação em duas etapas. Leva 2 minutos e é feito uma vez só.'; area.appendChild(telaAtivar2fa()); return; }
     if(!st.carregado){ titulo.innerHTML = 'Painel da <em>Casa</em>'; sub.textContent = ''; return; }
     var nomeCurto = /\s(e|E)\s/.test(st.nome || '') ? st.nome.trim() : (st.nome || '').trim().split(/\s+/)[0]; /* conta da dupla: "Luiza e Agatha" */
     if(st.aba === 'inicio'){ titulo.innerHTML = 'Olá, <em></em>'; titulo.querySelector('em').textContent = nomeCurto || 'equipe'; sub.textContent = 'Hoje é ' + limpa(fmtLongo.format(hoje)) + '.'; }
-    else { titulo.textContent = SECOES.filter(function(s){ return s[0] === st.aba; })[0][1]; sub.textContent = {reservas:'Confirme pré-reservas, crie e altere reservas.', salas:'Nome, tipo, foto, preços e disponibilidade de cada sala.', profissionais:'Quem aparece na página Profissionais do site, com foto e especialidade.', parceiros:'Desconto no aluguel, atendimentos lançados e repasses.', fixos:'Horários que já ficam reservados e se repetem.', funcionamento:'Horário de abertura, dias e contato que recebe as pré-reservas.'}[st.aba]; }
+    else { titulo.textContent = SECOES.filter(function(s){ return s[0] === st.aba; })[0][1]; sub.textContent = {reservas:'Confirme pré-reservas, crie e altere reservas.', salas:'Nome, tipo, foto, preços e disponibilidade de cada sala.', profissionais:'Quem aparece na página Profissionais do site, com foto e especialidade.', parceiros:'Desconto no aluguel, atendimentos lançados e repasses.', fixos:'Horários que já ficam reservados e se repetem.', seguranca:'Verificação em duas etapas, aparelhos conectados e últimos acessos.', funcionamento:'Horário de abertura, dias e contato que recebe as pré-reservas.'}[st.aba]; }
     var s = el('div', 'secao'); s.setAttribute('role', 'tabpanel'); s.setAttribute('aria-labelledby', 'tab-' + st.aba);
-    ({inicio: telaInicio, reservas: telaReservas, salas: telaSalas, profissionais: telaProfissionais, parceiros: telaParceiros, fixos: telaFixos, funcionamento: telaFuncionamento})[st.aba](s);
+    ({inicio: telaInicio, reservas: telaReservas, salas: telaSalas, profissionais: telaProfissionais, parceiros: telaParceiros, fixos: telaFixos, funcionamento: telaFuncionamento, seguranca: telaSeguranca})[st.aba](s);
     area.appendChild(s);
   }
   function semAcesso(){
@@ -154,6 +156,14 @@
     var se = entrada('l-senha', 'password', '', {autocomplete:'current-password'});
     f.appendChild(campo('E-mail', em)); f.appendChild(campo('Senha', se));
     var lm = el('label', 'lembrar'); var cb = el('input'); cb.type = 'checkbox'; cb.checked = true; lm.appendChild(cb); lm.appendChild(d.createTextNode('Manter conectado')); f.appendChild(lm);
+    /* Segundo passo: código de 6 números do aplicativo autenticador (ou um código de recuperação) */
+    var cod = entrada('l-cod', 'text', '', {inputmode:'numeric', autocomplete:'one-time-code', maxlength:'6', placeholder:'000000'});
+    var cCod = campo('Código do aplicativo autenticador', cod, null, 'Abra o Google Authenticator (ou o aplicativo que vocês usam) e digite o código de "Casa Lumière".'); cCod.hidden = true; f.appendChild(cCod);
+    var rec = entrada('l-rec', 'text', '', {autocomplete:'off', placeholder:'xxxxx-xxxxx'});
+    var cRec = campo('Código de recuperação', rec, null, 'Um dos códigos guardados quando a verificação foi ligada. Cada um vale uma vez.'); cRec.hidden = true; f.appendChild(cRec);
+    var troca = el('button', 'btn-texto', 'Estou sem o celular: usar um código de recuperação'); troca.type = 'button'; troca.hidden = true;
+    troca.addEventListener('click', function(){ var usarRec = cRec.hidden; cRec.hidden = !usarRec; cCod.hidden = usarRec; troca.textContent = usarRec ? 'Usar o código do aplicativo' : 'Estou sem o celular: usar um código de recuperação'; (usarRec ? rec : cod).focus(); });
+    f.appendChild(troca);
     var msg = el('p', 'msg'); msg.setAttribute('role', 'alert'); f.appendChild(msg);
     var bt = el('button', 'btn', 'Entrar'); bt.type = 'submit'; f.appendChild(bt);
     var aj = el('p', 'ajuda-login'); aj.appendChild(d.createTextNode('Esqueceu a senha? No site, toque em Entrar e depois em "Esqueci minha senha". ')); var vs = el('a', null, 'Voltar ao site'); vs.href = 'index.html'; aj.appendChild(vs); f.appendChild(aj);
@@ -161,9 +171,18 @@
       e.preventDefault(); msg.textContent = '';
       if(!em.value.trim() || !se.value){ msg.textContent = 'Digite o e-mail e a senha.'; return; }
       bt.disabled = true; bt.textContent = 'Entrando…';
-      api('POST', '/api/auth/entrar', {email: em.value.trim(), senha: se.value, lembrar: cb.checked}).then(function(r){
+      var corpo = {email: em.value.trim(), senha: se.value, lembrar: cb.checked};
+      if(!cCod.hidden && cod.value.trim()) corpo.codigo2fa = cod.value.trim();
+      if(!cRec.hidden && rec.value.trim()) corpo.recuperacao = rec.value.trim();
+      api('POST', '/api/auth/entrar', corpo).then(function(r){
+        if(r.recuperacoesRestantes != null) setTimeout(function(){ toast('Você usou um código de recuperação. Restam ' + r.recuperacoesRestantes + '. Em Segurança dá para gerar novos.', r.recuperacoesRestantes <= 3); }, 600);
         entrouComo(r.conta);
-      }).catch(function(err){ bt.disabled = false; bt.textContent = 'Entrar'; msg.textContent = err.message; });
+      }).catch(function(err){
+        bt.disabled = false; bt.textContent = 'Entrar';
+        if(err.erro === 'precisa_2fa'){ cCod.hidden = false; troca.hidden = false; msg.textContent = ''; cod.focus(); return; }
+        if(err.erro === 'codigo_2fa'){ cod.value = ''; rec.value = ''; }
+        msg.textContent = err.message;
+      });
     });
     a.appendChild(f);
     setTimeout(function(){ em.focus(); }, 30);
@@ -807,6 +826,174 @@
     });
   }
 
+  /* ===== Segurança: verificação em duas etapas ===== */
+  var qrPronto = null;
+  function carregarQr(){
+    if(window.qrcode) return Promise.resolve();
+    if(qrPronto) return qrPronto;
+    qrPronto = new Promise(function(ok, erro){ var sc = d.createElement('script'); sc.src = 'js/vendor/qrcode.js'; sc.onload = ok; sc.onerror = function(){ qrPronto = null; erro(); }; d.head.appendChild(sc); });
+    return qrPronto;
+  }
+  function chaveLegivel(k){ return String(k).replace(/(.{4})/g, '$1 ').trim(); }
+  function listaCodigos(codigos){
+    var w = el('div', 'codigos-rec');
+    var ol = el('ol'); codigos.forEach(function(c){ ol.appendChild(el('li', null, c)); }); w.appendChild(ol);
+    var ac = el('div', 'acoes-rec');
+    var cp = el('button', 'btn-borda', 'Copiar os códigos'); cp.type = 'button';
+    cp.addEventListener('click', function(){ (navigator.clipboard ? navigator.clipboard.writeText(codigos.join('\n')) : Promise.reject()).then(function(){ toast('Códigos copiados. Cole num lugar seguro.'); }, function(){ toast('Não deu para copiar. Anote os códigos à mão.', true); }); });
+    var bx = el('a', 'btn-borda', 'Baixar em arquivo'); bx.download = 'codigos-recuperacao-casa-lumiere.txt';
+    bx.href = URL.createObjectURL(new Blob(['Códigos de recuperação do painel da Casa Lumière\nCada código vale uma vez. Guarde em lugar seguro.\n\n' + codigos.join('\n') + '\n'], {type: 'text/plain'}));
+    ac.appendChild(cp); ac.appendChild(bx); w.appendChild(ac);
+    return w;
+  }
+  /* Passo a passo para ligar (ou trocar de celular). aoTerminar recebe os códigos de recuperação. */
+  function assistente2fa(aoTerminar){
+    var w = el('div', 'assistente-2fa');
+    var p1 = el('section', 'passo-2fa');
+    p1.appendChild(el('h3', null, '1. Instale o aplicativo'));
+    p1.appendChild(el('p', null, 'No celular, instale o Google Authenticator ou o Microsoft Authenticator (os dois são grátis). A Luiza e a Agatha podem usar o mesmo QR code, cada uma no seu celular.'));
+    w.appendChild(p1);
+    var p2 = el('section', 'passo-2fa'); p2.appendChild(el('h3', null, '2. Gere o QR code'));
+    var f2 = el('form'); f2.noValidate = true;
+    var ce = entrada('a2-codigo', 'password', '', {autocomplete:'off'});
+    f2.appendChild(campo('Código da equipe', ce, null, 'O mesmo código usado para criar a conta da equipe.'));
+    var m2 = el('p', 'msg'); m2.setAttribute('role', 'alert'); f2.appendChild(m2);
+    var b2 = el('button', 'btn', 'Gerar QR code'); b2.type = 'submit'; f2.appendChild(b2);
+    p2.appendChild(f2); w.appendChild(p2);
+    var p3 = el('section', 'passo-2fa'); p3.hidden = true; w.appendChild(p3);
+    f2.addEventListener('submit', function(e){
+      e.preventDefault(); m2.textContent = '';
+      if(!ce.value){ m2.textContent = 'Digite o código da equipe.'; return; }
+      b2.disabled = true; b2.textContent = 'Gerando…';
+      api('POST', '/api/admin/2fa/iniciar', {codigoEquipe: ce.value}).then(function(r){
+        b2.disabled = false; b2.textContent = 'Gerar de novo'; ce.value = '';
+        return carregarQr().catch(function(){}).then(function(){ mostrarQr(r); });
+      }).catch(function(err){ b2.disabled = false; b2.textContent = 'Gerar QR code'; m2.textContent = err.message; });
+    });
+    function mostrarQr(r){
+      p3.textContent = ''; p3.hidden = false;
+      p3.appendChild(el('h3', null, '3. Escaneie e confirme'));
+      p3.appendChild(el('p', null, 'No aplicativo, toque em "+" e em "Ler QR code". Depois digite aqui o código de 6 números que aparecer em "Casa Lumière".'));
+      var box = el('div', 'qr-2fa');
+      if(window.qrcode){ var qr = window.qrcode(0, 'M'); qr.addData(r.uri); qr.make(); var im = el('img'); im.src = qr.createDataURL(5, 2); im.alt = 'QR code para o aplicativo autenticador'; box.appendChild(im); }
+      var ch = el('div', 'chave-2fa'); ch.appendChild(el('span', null, 'Não dá para ler o QR? Digite esta chave no aplicativo:')); ch.appendChild(el('code', null, chaveLegivel(r.segredo))); box.appendChild(ch);
+      p3.appendChild(box);
+      var f3 = el('form'); f3.noValidate = true;
+      var cc = entrada('a2-app', 'text', '', {inputmode:'numeric', autocomplete:'one-time-code', maxlength:'6', placeholder:'000000'});
+      f3.appendChild(campo('Código de 6 números', cc));
+      var m3 = el('p', 'msg'); m3.setAttribute('role', 'alert'); f3.appendChild(m3);
+      var b3 = el('button', 'btn', 'Ligar a verificação'); b3.type = 'submit'; f3.appendChild(b3);
+      f3.addEventListener('submit', function(e){
+        e.preventDefault(); m3.textContent = '';
+        if(!/^\d{6}$/.test(cc.value.replace(/\s/g, ''))){ m3.textContent = 'Digite os 6 números do aplicativo.'; return; }
+        b3.disabled = true; b3.textContent = 'Conferindo…';
+        api('POST', '/api/admin/2fa/ativar', {codigo: cc.value.replace(/\s/g, '')}).then(function(r){ aoTerminar(r.codigos); })
+          .catch(function(err){ b3.disabled = false; b3.textContent = 'Ligar a verificação'; m3.textContent = err.message; cc.value = ''; cc.focus(); });
+      });
+      p3.appendChild(f3);
+      setTimeout(function(){ cc.focus(); }, 50);
+    }
+    return w;
+  }
+  function telaCodigosNovos(codigos, depois){
+    var w = el('div', 'guardar-codigos');
+    w.appendChild(el('h3', null, 'Guarde os códigos de recuperação'));
+    w.appendChild(el('p', null, 'Se o celular quebrar ou sumir, cada um destes códigos entra no painel uma vez, no lugar do código do aplicativo. Anote no papel ou baixe o arquivo e guarde num lugar seguro. Eles não aparecem de novo.'));
+    w.appendChild(listaCodigos(codigos));
+    var ck = el('label', 'linha-check'); var cb = el('input'); cb.type = 'checkbox'; ck.appendChild(cb); ck.appendChild(d.createTextNode('Guardei os códigos em lugar seguro')); w.appendChild(ck);
+    var bt = el('button', 'btn', 'Continuar'); bt.type = 'button'; bt.disabled = true; w.appendChild(bt);
+    cb.addEventListener('change', function(){ bt.disabled = !cb.checked; });
+    bt.addEventListener('click', depois);
+    return w;
+  }
+  function telaAtivar2fa(){
+    var a = el('div', 'ativar-2fa');
+    a.appendChild(el('p', 'intro-2fa', 'Com isso, para entrar no painel é preciso a senha e também um código que muda a cada 30 segundos no celular de vocês. Mesmo que alguém descubra a senha, não consegue entrar.'));
+    a.appendChild(assistente2fa(function(codigos){
+      a.textContent = '';
+      a.appendChild(telaCodigosNovos(codigos, function(){ st.acesso = true; $('estado').textContent = 'Carregando os dados da Casa…'; recarregar(); toast('Verificação em duas etapas ligada.'); }));
+    }));
+    var sa = el('button', 'btn-texto', 'Sair'); sa.type = 'button'; sa.addEventListener('click', sair); a.appendChild(sa);
+    return a;
+  }
+
+  var ROT_ACESSO = { entrou: ['ok', 'Entrou'], entrou_sem_2fa: ['pre', 'Entrou só com a senha'], senha_errada: ['erro', 'Senha errada'], codigo_errado: ['erro', 'Código errado'], ativou_2fa: ['ok', 'Ligou a verificação'], saiu_de_todos: ['ok', 'Saiu de todos os aparelhos'] };
+  function aparelhoDe(ua){
+    ua = String(ua || '');
+    var so = /iPhone/.test(ua) ? 'iPhone' : /iPad/.test(ua) ? 'iPad' : /Android/.test(ua) ? 'Android' : /Windows/.test(ua) ? 'Windows' : /Mac OS/.test(ua) ? 'Mac' : /Linux/.test(ua) ? 'Linux' : '';
+    var nav = /Edg\//.test(ua) ? 'Edge' : /OPR\//.test(ua) ? 'Opera' : /SamsungBrowser/.test(ua) ? 'Samsung Internet' : /Chrome\//.test(ua) ? 'Chrome' : /Firefox\//.test(ua) ? 'Firefox' : /Safari\//.test(ua) ? 'Safari' : '';
+    return [so, nav].filter(Boolean).join(' · ') || (ua ? ua.slice(0, 40) : 'Aparelho desconhecido');
+  }
+  var fmtAcesso = new Intl.DateTimeFormat('pt-BR', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit', timeZone:'America/Sao_Paulo'});
+  function telaSeguranca(s){
+    var seg = st.seguranca || {acessos: [], doisFatores: {}};
+    var df = seg.doisFatores || {};
+    var b = bloco('Verificação em duas etapas', 'Para entrar no painel: senha + código do aplicativo no celular');
+    var info = el('div', 'regras seg-info');
+    info.appendChild(el('span', df.ativo ? 'ok' : 'erro', df.ativo ? 'Ligada' : 'Desligada'));
+    info.appendChild(el('span', df.recuperacoesRestantes <= 3 ? 'erro' : null, 'Códigos de recuperação: ' + (df.recuperacoesRestantes || 0) + ' de 8'));
+    b.appendChild(info);
+    var ac = el('div', 'prof-acoes');
+    var nc = el('button', 'btn-borda', 'Gerar novos códigos de recuperação'); nc.type = 'button';
+    nc.addEventListener('click', function(){
+      abrirJanela('Novos códigos de recuperação', function(j, fechar){
+        var f = el('form'); f.noValidate = true;
+        f.appendChild(el('p', 'ajuda', 'Os códigos antigos deixam de valer. Para confirmar que é vocês, digite o código do aplicativo.'));
+        var cc = entrada('nc-app', 'text', '', {inputmode:'numeric', autocomplete:'one-time-code', maxlength:'6', placeholder:'000000'});
+        f.appendChild(campo('Código do aplicativo', cc));
+        var rod = el('div', 'rodape-form'); var msg = el('p', 'msg'); msg.setAttribute('role', 'alert'); rod.appendChild(msg);
+        var ok = el('button', 'btn', 'Gerar'); ok.type = 'submit'; rod.appendChild(ok); f.appendChild(rod);
+        f.addEventListener('submit', function(e){
+          e.preventDefault(); msg.textContent = ''; ok.disabled = true;
+          api('POST', '/api/admin/2fa/novos-codigos', {codigo2fa: cc.value.trim()}).then(function(r){
+            j.removeChild(f); j.appendChild(telaCodigosNovos(r.codigos, function(){ fechar(); recarregar(); }));
+          }).catch(function(err){ ok.disabled = false; msg.textContent = err.message; cc.value = ''; });
+        });
+        j.appendChild(f);
+      });
+    });
+    ac.appendChild(nc);
+    var tc = el('button', 'btn-borda', 'Trocar de celular'); tc.type = 'button';
+    tc.addEventListener('click', function(){
+      abrirJanela('Trocar de celular', function(j, fechar){
+        j.appendChild(el('p', 'ajuda janela-txt', 'Gera um QR code novo. O aplicativo antigo para de funcionar e os outros aparelhos saem do painel.'));
+        j.appendChild(assistente2fa(function(codigos){
+          var w = j.querySelector('.assistente-2fa'); if(w) w.remove();
+          j.appendChild(telaCodigosNovos(codigos, function(){ fechar(); recarregar(); toast('Celular trocado. Os outros aparelhos precisam entrar de novo.'); }));
+        }));
+      });
+    });
+    ac.appendChild(tc);
+    b.appendChild(ac);
+    s.appendChild(b);
+
+    var b2 = bloco('Aparelhos conectados', 'Se perderam um celular ou desconfiam de alguma coisa, desconectem todos de uma vez');
+    var sa = el('button', 'btn-texto perigo', 'Sair de todos os aparelhos (menos deste)'); sa.type = 'button';
+    sa.addEventListener('click', function(){
+      if(!sa.dataset.ok){ sa.dataset.ok = '1'; sa.textContent = 'Toque de novo para desconectar todos'; setTimeout(function(){ if(sa.isConnected){ delete sa.dataset.ok; sa.textContent = 'Sair de todos os aparelhos (menos deste)'; } }, 5000); return; }
+      escrever('sair-todos', function(){ return api('POST', '/api/admin/sair-todos'); }).then(function(ok){ if(ok) toast('Pronto. Os outros aparelhos precisam entrar de novo.'); });
+    });
+    b2.appendChild(sa);
+    b2.appendChild(el('p', 'ajuda', 'A senha da equipe se troca no site, em "Minha conta". Use pelo menos 12 caracteres; uma frase funciona bem.'));
+    s.appendChild(b2);
+
+    var b3 = bloco('Últimos acessos', 'Entradas e tentativas na conta da equipe nos últimos 90 dias. Algo estranho? Troquem a senha e saiam de todos os aparelhos');
+    var lst = seg.acessos || [];
+    if(!lst.length) b3.appendChild(vazio('Nenhum acesso registrado ainda', 'As próximas entradas aparecem aqui.'));
+    var ul = el('ul', 'lista acessos');
+    lst.forEach(function(x){
+      var rt = ROT_ACESSO[x.resultado] || ['pre', x.resultado];
+      var li = el('li', 'acesso');
+      li.appendChild(el('span', 'chip ' + rt[0], rt[1]));
+      var meio = el('div');
+      meio.appendChild(el('strong', null, limpa(fmtAcesso.format(new Date(x.quando)))));
+      meio.appendChild(el('span', null, aparelhoDe(x.aparelho) + (x.local ? ' · ' + x.local : '') + (x.ip ? ' · IP ' + x.ip : '')));
+      li.appendChild(meio); ul.appendChild(li);
+    });
+    b3.appendChild(ul);
+    s.appendChild(b3);
+  }
+
   /* Funcionamento */
   function telaFuncionamento(s){
     var g = st.geral || {abre:7, fecha:20, diasAFrente:100, diasAbertos:[0,1,2,3,4,5,6], whatsappAgatha:''};
@@ -892,12 +1079,13 @@
   }
   function recarregar(){
     return api('GET', '/api/admin/dados').then(function(r){
-      st.geral = r.geral; st.salas = r.salas; st.fixos = r.fixos; st.profissionais = r.profissionais || []; st.reservas = r.reservas; st.parceiros = r.parceiros || []; st.atendimentos = r.atendimentos || [];
+      st.geral = r.geral; st.salas = r.salas; st.fixos = r.fixos; st.profissionais = r.profissionais || []; st.reservas = r.reservas; st.parceiros = r.parceiros || []; st.atendimentos = r.atendimentos || []; st.seguranca = r.seguranca || null;
       hoje = deChave(r.agora.data); HOJE = r.agora.data;
       st.carregado = true; $('estado').textContent = '';
       if(podeRedesenhar()) desenhar(); else { redesenhoPendente = true; desenharMenu(); }
     }).catch(function(e){
       if(e.status === 401){ st.acesso = null; st.carregado = false; desenhar(); return; }
+      if(e.status === 403 && e.erro === 'configurar_2fa'){ st.acesso = 'configurar'; st.carregado = false; desenhar(); return; }
       if(e.status === 403){ st.acesso = false; desenhar(); return; }
       $('estado').textContent = e.status === 503 ? e.message : 'Não foi possível atualizar os dados agora.';
     });
@@ -930,6 +1118,6 @@
     if(r.conta) entrouComo(r.conta); else { st.acesso = null; desenhar(); }
   }).catch(function(e){ st.acesso = null; desenhar(); $('estado').textContent = e.status === 503 ? e.message : 'Não foi possível conectar agora.'; });
   /* Atualiza sozinho a cada 30 segundos e quando a aba volta a ficar visível */
-  setInterval(function(){ if(st.acesso === true && !d.hidden) recarregar(); }, 30000);
+  setInterval(function(){ if(st.acesso === true && !d.hidden && st.carregado) recarregar(); }, 30000);
   d.addEventListener('visibilitychange', function(){ if(st.acesso === true && !d.hidden) recarregar(); });
 })();

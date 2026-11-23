@@ -33,6 +33,14 @@ Revisão feita em 14/11/2026. Os ataques abaixo são testados automaticamente em
 | Ver o extrato de outro parceiro | Cada parceiro vê só o próprio extrato; cadastrar parceiro, lançar atendimento e dar baixa é só da equipe. |
 | Alterar o histórico de repasses | A porcentagem fica gravada em cada lançamento; mudar a parceria depois não altera o que já foi lançado. Parceiro com lançamentos não é apagado, só desativado. |
 | LGPD | O cliente pode excluir a própria conta. Pré-reservas abertas somem junto. |
+| Senha da equipe descoberta | Verificação em duas etapas obrigatória: além da senha, o painel pede o código de 6 números do aplicativo autenticador (muda a cada 30 s). Sem ela ligada, a conta da equipe só abre a tela de ativação. O segredo fica cifrado no banco (AES-256-GCM) e cada código vale uma vez só. |
+| Chutar o código do aplicativo | 5 códigos errados travam a verificação por 15 minutos, de qualquer lugar. |
+| Perder o celular | 8 códigos de recuperação de uso único (no banco fica só o hash). Dá para gerar novos e trocar de celular em Segurança. |
+| Alguém entrou e ficou conectado | "Sair de todos os aparelhos" em Segurança. Ligar a verificação ou trocar de celular também desconecta os outros aparelhos. |
+| Saber se alguém tentou entrar | Registro de acessos da equipe (90 dias) em Segurança: entradas, senha errada, código errado, aparelho e local aproximado. Com o e-mail ligado, cada entrada manda um aviso para o e-mail da equipe. |
+| Código da equipe fraco | No site de verdade, `CODIGO_EQUIPE` com menos de 10 caracteres (ou "lumiere") fica desligado. A redefinição de senha da equipe pede também o código do aplicativo. Senha da equipe: mínimo 12 caracteres. |
+| Robôs criando contas | Campo isca invisível no cadastro, limite por IP (IPv6 contado por bloco /64, para não dar para trocar de endereço a cada tentativa) e teto geral de contas, códigos e pré-reservas por hora. |
+| Envio gigante para travar o servidor | Pedidos maiores que 64 KB são recusados (fotos até 5 MB). |
 
 ## O que depende de você (e é onde a maioria dos ataques acontece)
 
@@ -43,6 +51,17 @@ Revisão feita em 14/11/2026. Os ataques abaixo são testados automaticamente em
 5. **Não mande chaves por WhatsApp ou print.** Se uma vazar, troque na Vercel e faça Redeploy. Trocar o `JWT_SECRET` desconecta todo mundo, o que é bom nesse caso.
 6. **Repositório privado** (opcional): o código não tem segredos, mas deixar privado esconde detalhes de como o sistema funciona.
 7. **Mantenha as dependências em dia**: rode `npm audit` de vez em quando.
+
+## Se perderem o celular e os códigos de recuperação
+
+Só quem tem acesso ao banco (Neon) consegue destravar. No painel da Neon, em SQL Editor, rode:
+
+```sql
+UPDATE usuarios SET totp_segredo = NULL, totp_pendente = NULL, recuperacao = '{}', sessao_versao = sessao_versao + 1
+ WHERE email = 'o-email-da-equipe';
+```
+
+Depois a equipe entra com a senha e liga a verificação de novo (pede o código da equipe). Trocar o `JWT_SECRET` também desliga a verificação, porque o segredo fica cifrado com ele: nesse caso, rode o mesmo comando.
 
 ## Limites honestos
 

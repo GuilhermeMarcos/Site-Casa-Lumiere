@@ -66,6 +66,18 @@ export function ipDe(req) {
   return String(ip).slice(0, 64);
 }
 
+// IP para os limites de tentativas. Em IPv6, cada casa recebe um bloco inteiro (/64) de endereços;
+// contamos o bloco, senão daria para trocar de endereço a cada tentativa.
+export function ipLimite(req) {
+  const ip = ipDe(req);
+  if (!ip.includes(':') || ip.startsWith('::ffff:')) return ip.replace(/^::ffff:/, '');
+  const partes = ip.split('%')[0].split('::');
+  const ini = partes[0] ? partes[0].split(':') : [];
+  const fim = partes.length > 1 && partes[1] ? partes[1].split(':') : [];
+  const cheio = partes.length > 1 ? [...ini, ...Array(Math.max(0, 8 - ini.length - fim.length)).fill('0'), ...fim] : ini;
+  return cheio.slice(0, 4).map((x) => (x || '0').toLowerCase().replace(/^0+(?=.)/, '')).join(':') + '::/64';
+}
+
 export function texto(v, max = 200) {
   return String(v ?? '').trim().slice(0, max);
 }

@@ -87,3 +87,18 @@ export function emailJaTemConta() {
     texto: 'Alguém tentou criar uma conta com este e-mail, mas ele já está cadastrado. Para entrar, use "Entrar" no site. Se esqueceu a senha, toque em "Esqueci minha senha".',
   };
 }
+
+const escapar = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+// Aviso para a equipe a cada entrada no painel: se não foi ela, dá para agir na hora
+export function emailNovoAcesso({ quando, local, aparelho }) {
+  const linhas = [['Quando', quando], ['Onde (aproximado)', local || 'não identificado'], ['Aparelho', aparelho || 'não identificado']];
+  return {
+    assunto: 'Novo acesso ao painel da Casa Lumière',
+    html: moldura('Alguém entrou no painel', '<p style="margin:0 0 12px;font-size:15px;line-height:1.6">A conta da equipe acabou de entrar no painel.</p>' +
+      linhas.map(([k, v]) => `<p style="margin:0 0 6px;font-size:14px;line-height:1.5"><strong>${escapar(k)}:</strong> ${escapar(v)}</p>`).join('') +
+      '<p style="margin:14px 0 0;font-size:14px;line-height:1.6">Se não foi vocês: troquem a senha e, no painel, em Segurança, toquem em "Sair de todos os aparelhos".</p>'),
+    texto: 'A conta da equipe acabou de entrar no painel.\n\n' + linhas.map(([k, v]) => `${k}: ${v}`).join('\n') +
+      '\n\nSe não foi vocês: troquem a senha e, no painel, em Segurança, toquem em "Sair de todos os aparelhos".',
+  };
+}
