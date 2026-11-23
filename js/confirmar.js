@@ -35,7 +35,7 @@
     f.innerHTML = '<label for="em">E-mail da equipe</label><input id="em" type="email" autocomplete="username" inputmode="email">' +
       '<label for="se">Senha</label><input id="se" type="password" autocomplete="current-password">' +
       '<label class="lembrar"><input type="checkbox" id="lb" checked>Manter conectada</label>' +
-      '<div id="passo2" hidden><label for="cd">Código do aplicativo autenticador</label><input id="cd" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000"></div>' +
+      '<div id="passo2" hidden><label for="cd" id="cd-rot">Código</label><input id="cd" autocomplete="one-time-code"><p class="sub" id="cd-ajuda" style="margin:.4rem 0 0"></p></div>' +
       '<p class="aviso erro" id="msg" role="alert"></p><button class="btn ouro" type="submit">Entrar</button>';
     tela.appendChild(f);
     var b = f.querySelector('button'), msg = f.querySelector('#msg');
@@ -44,14 +44,20 @@
       var em = f.querySelector('#em').value.trim(), se = f.querySelector('#se').value, p2 = f.querySelector('#passo2'), cd = f.querySelector('#cd');
       if(!em || !se){ msg.textContent = 'Digite o e-mail e a senha.'; return; }
       var corpo = {email: em, senha: se, lembrar: f.querySelector('#lb').checked};
-      if(!p2.hidden && cd.value.trim()) corpo.codigo2fa = cd.value.trim();
+      if(!p2.hidden && cd.value.trim()){ if(p2.dataset.modo === 'email') corpo.codigoEmail = cd.value.trim(); else corpo.codigoEquipe = cd.value.trim(); }
       b.disabled = true; b.textContent = 'Entrando…';
       api('POST', '/api/auth/entrar', corpo)
         .then(function(r){ if(!r.conta.equipe){ telaSemAcesso(); return; } carregar(); })
         .catch(function(err){
           b.disabled = false; b.textContent = 'Entrar';
-          if(err.erro === 'precisa_2fa'){ p2.hidden = false; cd.focus(); return; }
-          if(err.erro === 'codigo_2fa') cd.value = '';
+          if(err.erro === 'precisa_codigo' || err.erro === 'precisa_codigo_equipe'){
+            var email = err.erro === 'precisa_codigo';
+            p2.dataset.modo = email ? 'email' : 'equipe'; p2.hidden = false;
+            f.querySelector('#cd-rot').textContent = email ? 'Código que chegou no e-mail' : 'Código da equipe';
+            cd.type = email ? 'text' : 'password'; cd.inputMode = email ? 'numeric' : 'text';
+            f.querySelector('#cd-ajuda').textContent = err.message; cd.focus(); return;
+          }
+          if(err.erro === 'codigo_errado' || err.erro === 'codigo_vencido' || err.erro === 'codigo_equipe') cd.value = '';
           msg.textContent = err.message;
         });
     });
@@ -121,7 +127,6 @@
       .then(function(r){ mostrar(r.reserva); })
       .catch(function(e){
         if(e.status === 401) telaEntrar();
-        else if(e.erro === 'configurar_2fa') erro('Antes de confirmar pelo celular, ative a verificação em duas etapas no painel da Casa. Leva 2 minutos.');
         else if(e.status === 403) telaSemAcesso();
         else erro(e.message);
       });

@@ -3,10 +3,11 @@ import { scrypt, randomBytes, timingSafeEqual, createHmac } from 'node:crypto';
 import { promisify } from 'node:util';
 import { q } from './db.js';
 import { Falha, lerCookies, ipLimite } from './http.js';
-import { exigir2fa } from './doisfatores.js';
 
 const scryptAsync = promisify(scrypt);
 const COOKIE = 'cl_sessao';
+// Segunda etapa da conta da equipe (código por e-mail, ou o código da equipe enquanto o e-mail não estiver ligado)
+export const exigir2fa = () => process.env.EQUIPE_2FA !== '0';
 const LONGA = 30 * 24 * 3600; // "manter conectado": 30 dias
 const CURTA = 12 * 3600;      // sem "manter conectado": 12 horas
 
@@ -110,7 +111,7 @@ export function publico(u) {
 export async function usuarioAtual(req) {
   const t = lerToken(lerCookies(req)[COOKIE]);
   if (!t) return null;
-  const [u] = await q('SELECT id, nome, email, telefone, especialidade, sessao_versao, (totp_segredo IS NOT NULL) AS totp_ativo FROM usuarios WHERE id = $1', [t.uid]);
+  const [u] = await q('SELECT id, nome, email, telefone, especialidade, sessao_versao FROM usuarios WHERE id = $1', [t.uid]);
   if (!u || Number(u.sessao_versao) !== t.versao) return null;
   u.mfa = t.mfa;
   return u;
@@ -122,14 +123,12 @@ export async function exigirLogin(req) {
   return u;
 }
 
-/* Equipe: além da senha, a sessão precisa ter passado pelo código do aplicativo autenticador.
-   Sem a verificação em duas etapas ligada, a conta só consegue abrir a tela de ativação (configurando). */
-export async function exigirEquipe(req, { configurando = false } = {}) {
+/* Equipe: além da senha, a sessão precisa ter passado pela segunda etapa
+   (código que chega no e-mail da equipe). Sessões antigas, só com a senha, precisam entrar de novo. */
+export async function exigirEquipe(req) {
   const u = await exigirLogin(req);
   if (!ehEquipe(u.email)) throw new Falha(403, 'sem_acesso', 'Esta área é só para a equipe da Casa.');
-  if (!exigir2fa()) return u;
-  if (u.totp_ativo && !u.mfa) throw new Falha(401, 'precisa_2fa', 'Por segurança, entre de novo com o código do aplicativo autenticador.');
-  if (!u.totp_ativo && !configurando) throw new Falha(403, 'configurar_2fa', 'Ative a verificação em duas etapas para usar o painel.');
+  if (exigir2fa() && !u.mfa) throw new Falha(401, 'precisa_codigo', 'Por segurança, entre de novo. Vamos pedir um código.');
   return u;
 }
 

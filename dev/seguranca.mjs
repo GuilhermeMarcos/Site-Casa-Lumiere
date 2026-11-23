@@ -1,14 +1,13 @@
-// Testes de segurança da conta da equipe (verificação em duas etapas) e contra spam. `npm test`
+// Testes de segurança da conta da equipe (senha + código no e-mail) e contra spam. `npm test`
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import { preparar, ligar2fa, codigoApp } from './preparar.mjs';
+import { preparar, caixaDeEntrada } from './preparar.mjs';
 import handler from '../api/index.js';
-import { emailNovoAcesso } from '../api/_lib/correio.js';
 
 let pg, servidor, base;
 before(async () => {
-  pg = await preparar();
+  pg = await preparar({ correio: true });
   servidor = http.createServer(handler).listen(0);
   base = `http://127.0.0.1:${servidor.address().port}`;
 });
@@ -32,99 +31,80 @@ function cliente(ip = `100.66.0.${ipSeq++}`, extras = {}) {
 }
 const EMAIL = 'equipe@casalumiere.com.br', SENHA = 'Senha-Forte-da-Casa-2026';
 const pc = cliente(), celular = cliente(), comum = cliente();
-let segredo, recuperacao;
+const ultimo = (email) => [...caixaDeEntrada].reverse().find((m) => m.para === email);
+const codigoDe = (email) => /(\d{6})/.exec(ultimo(email).assunto)[1];
 
-test('senha da equipe precisa de 12 caracteres', async () => {
-  const r = await pc('POST', '/api/auth/cadastro', { nome: 'Luiza e Agatha', email: EMAIL, telefone: '19992487347', senha: 'Curta-123', codigoEquipe: 'lumiere' });
-  assert.equal(r.status, 400);
-  assert.equal((await pc('POST', '/api/auth/cadastro', { nome: 'Luiza e Agatha', email: EMAIL, telefone: '19992487347', senha: SENHA, codigoEquipe: 'lumiere' })).status, 201);
-  assert.equal((await comum('POST', '/api/auth/cadastro', { nome: 'Cliente', email: 'cliente@exemplo.com', telefone: '19990000001', senha: 'Senha-Comum-1' })).status, 201);
+test('conta da equipe: senha de 12 caracteres, código da equipe e código do e-mail', async () => {
+  assert.equal((await pc('POST', '/api/auth/codigo', { email: EMAIL, finalidade: 'cadastro' })).status, 200);
+  const base = { nome: 'Luiza e Agatha', email: EMAIL, telefone: '19992487347', codigoEquipe: 'lumiere' };
+  assert.equal((await pc('POST', '/api/auth/cadastro', { ...base, senha: 'Curta-123', codigo: codigoDe(EMAIL) })).status, 400);
+  const r = await pc('POST', '/api/auth/cadastro', { ...base, senha: SENHA, codigo: codigoDe(EMAIL) });
+  assert.equal(r.status, 201);
+  assert.equal((await pc('GET', '/api/admin/dados')).status, 200, 'quem criou a conta (com os dois códigos) já entra');
+  assert.equal((await comum('POST', '/api/auth/codigo', { email: 'cliente@exemplo.com', finalidade: 'cadastro' })).status, 200);
+  assert.equal((await comum('POST', '/api/auth/cadastro', { nome: 'Cliente', email: 'cliente@exemplo.com', telefone: '19990000001', senha: 'Senha-Comum-1', codigo: codigoDe('cliente@exemplo.com') })).status, 201);
 });
 
-test('sem a verificação ligada, a equipe só vê a tela de ativação', async () => {
-  for (const [m, c] of [['GET', '/api/admin/dados'], ['POST', '/api/admin/salas'], ['GET', '/api/admin/reservas/x'], ['POST', '/api/admin/sair-todos']]) {
-    const r = await pc(m, c);
-    assert.equal(r.status, 403, c); assert.equal(r.dados.erro, 'configurar_2fa', c);
-  }
-  const s = await pc('GET', '/api/admin/2fa');
-  assert.equal(s.status, 200); assert.equal(s.dados.ativo, false);
-  assert.equal((await comum('GET', '/api/admin/2fa')).status, 403, 'cliente não mexe nisso');
-  assert.equal((await comum('POST', '/api/admin/2fa/iniciar', { codigoEquipe: 'lumiere' })).status, 403);
-});
-
-test('ativar pede o código da equipe e o primeiro código do aplicativo', async () => {
-  assert.equal((await pc('POST', '/api/admin/2fa/iniciar', { codigoEquipe: 'chute' })).status, 403);
-  assert.equal((await pc('POST', '/api/admin/2fa/ativar', { codigo: '123456' })).status, 400, 'sem ter começado');
-  // o celular entra com a senha antes da ativação (sessão sem o segundo fator)
-  assert.equal((await celular('POST', '/api/auth/entrar', { email: EMAIL, senha: SENHA, lembrar: true })).status, 200);
-  const r = await ligar2fa(pc);
-  segredo = r.segredo; recuperacao = r.codigos;
-  assert.equal(recuperacao.length, 8);
-  assert.equal((await pc('GET', '/api/admin/dados')).status, 200, 'quem ativou entra direto');
-  const velho = await celular('GET', '/api/admin/dados');
-  assert.equal(velho.status, 401, 'ativar derruba as sessões abertas em outros aparelhos');
-});
-
-test('entrar exige o código do aplicativo; código errado não entra', async () => {
-  const antes = celular.cookie();
-  let r = await celular('POST', '/api/auth/entrar', { email: EMAIL, senha: SENHA });
-  assert.equal(r.status, 401); assert.equal(r.dados.erro, 'precisa_2fa');
-  assert.equal(celular.cookie(), antes, 'sem código não recebe sessão nova');
-  r = await celular('POST', '/api/auth/entrar', { email: EMAIL, senha: SENHA, codigo2fa: '000000' });
-  assert.equal(r.status, 401); assert.equal(r.dados.erro, 'codigo_2fa');
-  r = await celular('POST', '/api/auth/entrar', { email: EMAIL, senha: 'senha-errada-qualquer', codigo2fa: await codigoApp(segredo) });
+test('aparelho novo: depois da senha, chega um código no e-mail da equipe', async () => {
+  const antes = caixaDeEntrada.length;
+  let r = await celular('POST', '/api/auth/entrar', { email: EMAIL, senha: SENHA, lembrar: true });
+  assert.equal(r.status, 401); assert.equal(r.dados.erro, 'precisa_codigo');
+  assert.match(r.dados.mensagem, /eq\*+@casalumiere\.com\.br/, 'mostra o e-mail escondido');
+  assert.equal(celular.cookie(), '', 'sem o código, não recebe sessão');
+  assert.equal(caixaDeEntrada.length, antes + 1);
+  assert.match(ultimo(EMAIL).assunto, /código para entrar no painel/);
+  // tocou em Entrar de novo logo em seguida: não manda outro e-mail, o código anterior continua valendo
+  r = await celular('POST', '/api/auth/entrar', { email: EMAIL, senha: SENHA, lembrar: true });
+  assert.equal(r.dados.erro, 'precisa_codigo'); assert.equal(caixaDeEntrada.length, antes + 1);
+  const codigo = codigoDe(EMAIL);
+  r = await celular('POST', '/api/auth/entrar', { email: EMAIL, senha: SENHA, codigoEmail: codigo === '000000' ? '111111' : '000000' });
+  assert.equal(r.status, 400); assert.equal(r.dados.erro, 'codigo_errado');
+  r = await celular('POST', '/api/auth/entrar', { email: EMAIL, senha: 'senha-errada-qualquer', codigoEmail: codigo });
   assert.equal(r.status, 401); assert.equal(r.dados.erro, 'senha', 'código certo com senha errada não entra');
-  const codigo = await codigoApp(segredo);
-  r = await celular('POST', '/api/auth/entrar', { email: EMAIL, senha: SENHA, codigo2fa: codigo, lembrar: true });
+  r = await celular('POST', '/api/auth/entrar', { email: EMAIL, senha: SENHA, codigoEmail: codigo, lembrar: true });
   assert.equal(r.status, 200);
   assert.equal((await celular('GET', '/api/admin/dados')).status, 200);
-  // o mesmo código não serve duas vezes (alguém que viu por cima do ombro)
-  const outro = cliente();
-  r = await outro('POST', '/api/auth/entrar', { email: EMAIL, senha: SENHA, codigo2fa: codigo });
-  assert.equal(r.status, 401);
+  r = await cliente()('POST', '/api/auth/entrar', { email: EMAIL, senha: SENHA, codigoEmail: codigo });
+  assert.equal(r.status, 400, 'o mesmo código não serve duas vezes');
 });
 
-test('5 códigos errados travam a verificação por 15 minutos, de qualquer lugar', async () => {
-  await pg.query('UPDATE usuarios SET totp_falhas = 0 WHERE email = $1', [EMAIL]);
-  try {
-    for (let i = 0; i < 5; i++) assert.equal((await cliente()('POST', '/api/auth/entrar', { email: EMAIL, senha: SENHA, codigo2fa: '111111' })).status, 401);
-    const r = await cliente()('POST', '/api/auth/entrar', { email: EMAIL, senha: SENHA, codigo2fa: await codigoApp(segredo) });
-    assert.equal(r.status, 429, 'travado mesmo com o código certo');
-  } finally {
-    await pg.query('UPDATE usuarios SET totp_bloqueado_ate = NULL, totp_falhas = 0 WHERE email = $1', [EMAIL]);
-  }
-});
-
-test('código de recuperação entra uma vez só', async () => {
+test('5 tentativas erradas anulam o código', async () => {
   const a = cliente();
-  let r = await a('POST', '/api/auth/entrar', { email: EMAIL, senha: SENHA, recuperacao: recuperacao[0] });
-  assert.equal(r.status, 200); assert.equal(r.dados.recuperacoesRestantes, 7);
-  r = await cliente()('POST', '/api/auth/entrar', { email: EMAIL, senha: SENHA, recuperacao: recuperacao[0] });
-  assert.equal(r.status, 401, 'já foi usado');
-  r = await cliente()('POST', '/api/auth/entrar', { email: EMAIL, senha: SENHA, recuperacao: 'aaaaa-bbbbb' });
-  assert.equal(r.status, 401);
+  await new Promise((ok) => setTimeout(ok, 10));
+  await pg.query("DELETE FROM limites WHERE chave LIKE 'codigo-1min|entrar|%'");
+  await a('POST', '/api/auth/entrar', { email: EMAIL, senha: SENHA });
+  const certo = codigoDe(EMAIL);
+  const errado = certo === '123456' ? '654321' : '123456';
+  for (let i = 0; i < 5; i++) await a('POST', '/api/auth/entrar', { email: EMAIL, senha: SENHA, codigoEmail: errado });
+  const r = await a('POST', '/api/auth/entrar', { email: EMAIL, senha: SENHA, codigoEmail: certo });
+  assert.equal(r.status, 400, 'nem o código certo vale mais: precisa pedir outro');
 });
 
-test('segredo do aplicativo e códigos de recuperação não ficam legíveis no banco', async () => {
-  const { rows: [u] } = await pg.query('SELECT totp_segredo, recuperacao FROM usuarios WHERE email = $1', [EMAIL]);
-  assert.ok(!u.totp_segredo.includes(segredo), 'segredo cifrado');
-  assert.ok(u.recuperacao.every((h) => !recuperacao.includes(h)), 'só o hash dos códigos');
-  const dados = (await pc('GET', '/api/admin/dados')).dados;
-  assert.ok(!JSON.stringify(dados).includes(u.totp_segredo), 'o painel nunca recebe o segredo');
-});
-
-test('novos códigos de recuperação pedem o código do aplicativo e anulam os antigos', async () => {
-  assert.equal((await pc('POST', '/api/admin/2fa/novos-codigos', { codigo2fa: '222222' })).status, 401);
-  const r = await pc('POST', '/api/admin/2fa/novos-codigos', { codigo2fa: await codigoApp(segredo) });
-  assert.equal(r.status, 200); assert.equal(r.dados.codigos.length, 8);
-  assert.equal((await cliente()('POST', '/api/auth/entrar', { email: EMAIL, senha: SENHA, recuperacao: recuperacao[1] })).status, 401, 'antigo não vale mais');
-  recuperacao = r.dados.codigos;
+test('trocar a senha pelo e-mail não pula a segunda etapa', async () => {
+  await pg.query("DELETE FROM limites WHERE chave LIKE 'codigo-1min|%'");
+  const x = cliente();
+  assert.equal((await x('POST', '/api/auth/codigo', { email: EMAIL, finalidade: 'senha' })).status, 200);
+  const codSenha = codigoDe(EMAIL);
+  // o código de trocar senha não serve para entrar no painel
+  let r = await x('POST', '/api/auth/entrar', { email: EMAIL, senha: SENHA, codigoEmail: codSenha });
+  assert.notEqual(r.status, 200);
+  r = await x('POST', '/api/auth/recuperar', { email: EMAIL, codigo: codSenha, senhaNova: 'Outra-Senha-Forte-da-Casa' });
+  assert.equal(r.status, 200);
+  r = await x('GET', '/api/admin/dados');
+  assert.equal(r.status, 401); assert.equal(r.dados.erro, 'precisa_codigo');
+  assert.equal((await pc('GET', '/api/admin/dados')).status, 401, 'senha nova desconecta os outros aparelhos');
+  await pg.query("DELETE FROM limites WHERE chave LIKE 'codigo-1min|%'");
+  await pc('POST', '/api/auth/entrar', { email: EMAIL, senha: 'Outra-Senha-Forte-da-Casa', lembrar: true });
+  r = await pc('POST', '/api/auth/entrar', { email: EMAIL, senha: 'Outra-Senha-Forte-da-Casa', codigoEmail: codigoDe(EMAIL), lembrar: true });
+  assert.equal(r.status, 200);
 });
 
 test('sair de todos os aparelhos', async () => {
+  await pg.query("DELETE FROM limites WHERE chave LIKE 'codigo-1min|%'");
+  await celular('POST', '/api/auth/entrar', { email: EMAIL, senha: 'Outra-Senha-Forte-da-Casa', lembrar: true });
+  assert.equal((await celular('POST', '/api/auth/entrar', { email: EMAIL, senha: 'Outra-Senha-Forte-da-Casa', codigoEmail: codigoDe(EMAIL), lembrar: true })).status, 200);
   assert.equal((await celular('GET', '/api/admin/dados')).status, 200);
-  const r = await pc('POST', '/api/admin/sair-todos');
-  assert.equal(r.status, 200);
+  assert.equal((await pc('POST', '/api/admin/sair-todos')).status, 200);
   assert.equal((await celular('GET', '/api/admin/dados')).status, 401, 'o outro aparelho saiu');
   assert.equal((await pc('GET', '/api/admin/dados')).status, 200, 'este continua');
 });
@@ -132,9 +112,8 @@ test('sair de todos os aparelhos', async () => {
 test('registro de acessos aparece no painel', async () => {
   const s = (await pc('GET', '/api/admin/dados')).dados.seguranca;
   const tipos = s.acessos.map((a) => a.resultado);
-  for (const t of ['entrou', 'codigo_errado', 'senha_errada', 'ativou_2fa', 'saiu_de_todos']) assert.ok(tipos.includes(t), t + ' ' + tipos.join(','));
-  assert.equal(s.doisFatores.ativo, true);
-  assert.equal(s.doisFatores.recuperacoesRestantes, 8);
+  for (const t of ['entrou', 'codigo_errado', 'senha_errada', 'saiu_de_todos']) assert.ok(tipos.includes(t), t + ' ' + tipos.join(','));
+  assert.equal(s.segundaEtapa, 'email');
   assert.equal(s.acessos[0].aparelho, 'Teste/1.0');
 });
 
@@ -147,9 +126,7 @@ test('no site de verdade, código da equipe fraco fica desligado', async () => {
   const antes = process.env.VERCEL_ENV;
   process.env.VERCEL_ENV = 'production';
   try {
-    assert.equal((await pc('POST', '/api/admin/2fa/iniciar', { codigoEquipe: 'lumiere' })).status, 503);
-    assert.equal((await cliente()('POST', '/api/auth/redefinir-equipe', { email: EMAIL, codigo: 'lumiere', senhaNova: 'Nova-Senha-Forte-77', codigo2fa: '123456' })).status, 403);
-    assert.equal((await pc('GET', '/api/admin/2fa')).dados.codigoEquipeFraco, true);
+    assert.equal((await cliente()('POST', '/api/auth/redefinir-equipe', { email: EMAIL, codigo: 'lumiere', senhaNova: 'Nova-Senha-Forte-77' })).status, 403);
   } finally {
     if (antes === undefined) delete process.env.VERCEL_ENV; else process.env.VERCEL_ENV = antes;
   }
@@ -184,8 +161,3 @@ test('corpo gigante é recusado antes de qualquer trabalho', async () => {
   assert.equal(r.status, 413);
 });
 
-test('e-mail de aviso de acesso não deixa o aparelho virar código', () => {
-  const m = emailNovoAcesso({ quando: 'agora', local: 'Holambra', aparelho: '<script>alert(1)</script>' });
-  assert.ok(!m.html.includes('<script>'));
-  assert.ok(m.html.includes('&lt;script&gt;'));
-});
