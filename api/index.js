@@ -47,6 +47,9 @@ export default async function handler(req, res) {
     const tipo = String(req.headers['content-type'] || '');
     const temCorpo = Number(req.headers['content-length'] || 0) > 0 || !!req.headers['transfer-encoding'];
     if (metodo !== 'GET' && temCorpo && !tipo.toLowerCase().startsWith('application/json')) throw new Falha(415, 'tipo', 'Pedido recusado.');
+    // Só o envio de foto pode ser grande; o resto cabe em poucos KB (um corpo enorme seria abuso)
+    const tamanho = Number(req.headers['content-length'] || 0);
+    if (tamanho > (/\/foto$/.test(caminho) ? 5 * 1024 * 1024 : 64 * 1024)) throw new Falha(413, 'grande_demais', 'O envio passou do tamanho permitido.');
     const corpo = metodo === 'GET' || metodo === 'DELETE' ? {} : await lerCorpo(req);
     await garantirEsquema();
     const [status, dados, cabecalhos] = await achou.fn(req, params, corpo || {});

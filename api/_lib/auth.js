@@ -2,7 +2,8 @@
 import { scrypt, randomBytes, timingSafeEqual, createHmac } from 'node:crypto';
 import { promisify } from 'node:util';
 import { q } from './db.js';
-import { Falha, lerCookies, ipDe } from './http.js';
+import { Falha, lerCookies, ipLimite } from './http.js';
+import { exigir2fa } from './doisfatores.js';
 
 const scryptAsync = promisify(scrypt);
 const COOKIE = 'cl_sessao';
@@ -37,10 +38,12 @@ const COMUNS = new Set(['12345678', '123456789', '1234567890', '87654321', '1111
   'senha123', 'senha1234', 'senha12345', 'password', 'password1', 'qwerty123', 'abc12345', 'abcd1234', 'iloveyou',
   'casalumiere', 'lumiere123', 'holambra', 'holambra123', 'mudar123', 'admin123', 'brasil123', 'teste123']);
 
-// Senha nova: pelo menos 8 caracteres, não pode ser uma das mais usadas nem o próprio e-mail
+// Senha nova: pelo menos 8 caracteres (12 para a equipe), não pode ser uma das mais usadas nem o próprio e-mail
 export function checarSenhaNova(senha, email = '') {
   const s = String(senha || '');
-  if (s.length < 8 || s.length > 200) throw new Falha(400, 'senha', 'A senha precisa ter pelo menos 8 caracteres.');
+  if (s.length > 200) throw new Falha(400, 'senha', 'A senha pode ter até 200 caracteres.');
+  if (ehEquipe(email) && s.length < 12) throw new Falha(400, 'senha', 'A senha da equipe precisa ter pelo menos 12 caracteres. Dica: use uma frase, como "sala-dourada-de-holambra".');
+  if (s.length < 8) throw new Falha(400, 'senha', 'A senha precisa ter pelo menos 8 caracteres.');
   const baixa = s.toLowerCase();
   if (COMUNS.has(baixa) || /^(.)\1+$/.test(s) || (email && (baixa === email.toLowerCase() || baixa === email.split('@')[0].toLowerCase()))) {
     throw new Falha(400, 'senha_fraca', 'Essa senha é fácil de adivinhar. Use uma combinação diferente.');
@@ -54,8 +57,8 @@ const b64 = (s) => Buffer.from(s).toString('base64url');
 const assinar = (dados) => createHmac('sha256', segredo()).update(dados).digest('base64url');
 export const assinarTexto = (t) => assinar(t);
 
-function criarToken(uid, versao, segundos) {
-  const corpo = b64(JSON.stringify({ u: uid, v: versao || 0, e: Math.floor(Date.now() / 1000) + segundos }));
+function criarToken(uid, versao, segundos, mfa) {
+  const corpo = b64(JSON.stringify({ u: uid, v: versao || 0, e: Math.floor(Date.now() / 1000) + segundos, ...(mfa ? { m: 1 } : {}) }));
   return `${corpo}.${assinar(corpo)}`;
 }
 
@@ -68,7 +71,7 @@ function lerToken(token) {
   try {
     const p = JSON.parse(Buffer.from(corpo, 'base64url').toString('utf8'));
     if (typeof p.u !== 'string' || !p.e || p.e < Date.now() / 1000) return null;
-    return { uid: p.u, versao: Number(p.v) || 0 };
+    return { uid: p.u, versao: Number(p.v) || 0, mfa: p.m === 1 };
   } catch {
     return null;
   }
@@ -79,9 +82,10 @@ function seguro(req) {
   return proto ? proto.split(',')[0].trim() === 'https' : !!(req.socket && req.socket.encrypted);
 }
 
-export function cookieSessao(req, uid, versao, lembrar) {
+// mfa: a pessoa passou pela verificação em duas etapas nesta entrada (só conta para a equipe)
+export function cookieSessao(req, uid, versao, lembrar, mfa = false) {
   const seg = lembrar ? LONGA : CURTA;
-  const partes = [`${COOKIE}=${criarToken(uid, versao, seg)}`, 'Path=/', 'HttpOnly', 'SameSite=Lax'];
+  const partes = [`${COOKIE}=${criarToken(uid, versao, seg, mfa)}`, 'Path=/', 'HttpOnly', 'SameSite=Lax'];
   if (lembrar) partes.push(`Max-Age=${seg}`);
   if (seguro(req)) partes.push('Secure');
   return partes.join('; ');
@@ -106,8 +110,9 @@ export function publico(u) {
 export async function usuarioAtual(req) {
   const t = lerToken(lerCookies(req)[COOKIE]);
   if (!t) return null;
-  const [u] = await q('SELECT id, nome, email, telefone, especialidade, sessao_versao FROM usuarios WHERE id = $1', [t.uid]);
+  const [u] = await q('SELECT id, nome, email, telefone, especialidade, sessao_versao, (totp_segredo IS NOT NULL) AS totp_ativo FROM usuarios WHERE id = $1', [t.uid]);
   if (!u || Number(u.sessao_versao) !== t.versao) return null;
+  u.mfa = t.mfa;
   return u;
 }
 
@@ -117,9 +122,14 @@ export async function exigirLogin(req) {
   return u;
 }
 
-export async function exigirEquipe(req) {
+/* Equipe: além da senha, a sessão precisa ter passado pelo código do aplicativo autenticador.
+   Sem a verificação em duas etapas ligada, a conta só consegue abrir a tela de ativação (configurando). */
+export async function exigirEquipe(req, { configurando = false } = {}) {
   const u = await exigirLogin(req);
   if (!ehEquipe(u.email)) throw new Falha(403, 'sem_acesso', 'Esta área é só para a equipe da Casa.');
+  if (!exigir2fa()) return u;
+  if (u.totp_ativo && !u.mfa) throw new Falha(401, 'precisa_2fa', 'Por segurança, entre de novo com o código do aplicativo autenticador.');
+  if (!u.totp_ativo && !configurando) throw new Falha(403, 'configurar_2fa', 'Ative a verificação em duas etapas para usar o painel.');
   return u;
 }
 
@@ -138,7 +148,7 @@ export async function limitar(chave, max, segundos, mensagem) {
 }
 
 // Trava de senha errada: por e-mail E aparelho (IP). Assim ninguém consegue trancar a conta da equipe errando de propósito de outro lugar.
-const chaveTrava = (email, req) => `${String(email).toLowerCase()}|${ipDe(req)}`;
+const chaveTrava = (email, req) => `${String(email).toLowerCase()}|${ipLimite(req)}`;
 export async function checarBloqueio(email, req) {
   const [t] = await q('SELECT bloqueado_ate FROM tentativas WHERE email = $1 AND bloqueado_ate > now()', [chaveTrava(email, req)]);
   if (t) throw new Falha(429, 'bloqueado', 'Muitas tentativas com este e-mail. Espere 15 minutos e tente de novo.');
@@ -154,9 +164,14 @@ export async function registrarFalha(email, req) {
 }
 export const limparFalhas = (email, req) => q('DELETE FROM tentativas WHERE email = $1', [chaveTrava(email, req)]);
 
+// No site de verdade, o código da equipe não pode ser o de teste nem curto demais
+export function codigoEquipeFraco() {
+  const c = String(process.env.CODIGO_EQUIPE || '');
+  return process.env.VERCEL_ENV === 'production' && (c.length < 10 || c.toLowerCase() === 'lumiere');
+}
 export function codigoEquipeConfere(codigo) {
   const certo = String(process.env.CODIGO_EQUIPE || '');
-  if (!certo) return false;
+  if (!certo || codigoEquipeFraco()) return false;
   const a = Buffer.from(String(codigo || '')), b = Buffer.from(certo);
   return a.length === b.length && timingSafeEqual(a, b);
 }

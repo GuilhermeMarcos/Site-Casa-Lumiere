@@ -15,7 +15,7 @@
     for(var i = 1; i <= h.length; i++){ if(h[i] === f + 1) f = h[i]; else { out.push(i0 + 'h às ' + (f + 1) + 'h'); i0 = f = h[i]; } } return out.join(', '); }
   function api(metodo, caminho, corpo){
     return fetch(caminho, {method: metodo, credentials: 'same-origin', headers: corpo ? {'Content-Type': 'application/json'} : {}, body: corpo ? JSON.stringify(corpo) : undefined})
-      .then(function(r){ return r.json().catch(function(){ return {}; }).then(function(dados){ if(!r.ok){ var e = new Error(dados.mensagem || 'Não foi possível concluir agora.'); e.status = r.status; throw e; } return dados; }); },
+      .then(function(r){ return r.json().catch(function(){ return {}; }).then(function(dados){ if(!r.ok){ var e = new Error(dados.mensagem || 'Não foi possível concluir agora.'); e.status = r.status; e.erro = dados.erro; throw e; } return dados; }); },
         function(){ var e = new Error('Sem internet. Confira a conexão e tente de novo.'); e.status = 0; throw e; });
   }
   function linkWhats(tel, msg, web){
@@ -35,17 +35,25 @@
     f.innerHTML = '<label for="em">E-mail da equipe</label><input id="em" type="email" autocomplete="username" inputmode="email">' +
       '<label for="se">Senha</label><input id="se" type="password" autocomplete="current-password">' +
       '<label class="lembrar"><input type="checkbox" id="lb" checked>Manter conectada</label>' +
+      '<div id="passo2" hidden><label for="cd">Código do aplicativo autenticador</label><input id="cd" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000"></div>' +
       '<p class="aviso erro" id="msg" role="alert"></p><button class="btn ouro" type="submit">Entrar</button>';
     tela.appendChild(f);
     var b = f.querySelector('button'), msg = f.querySelector('#msg');
     f.addEventListener('submit', function(e){
       e.preventDefault(); msg.textContent = '';
-      var em = f.querySelector('#em').value.trim(), se = f.querySelector('#se').value;
+      var em = f.querySelector('#em').value.trim(), se = f.querySelector('#se').value, p2 = f.querySelector('#passo2'), cd = f.querySelector('#cd');
       if(!em || !se){ msg.textContent = 'Digite o e-mail e a senha.'; return; }
+      var corpo = {email: em, senha: se, lembrar: f.querySelector('#lb').checked};
+      if(!p2.hidden && cd.value.trim()) corpo.codigo2fa = cd.value.trim();
       b.disabled = true; b.textContent = 'Entrando…';
-      api('POST', '/api/auth/entrar', {email: em, senha: se, lembrar: f.querySelector('#lb').checked})
+      api('POST', '/api/auth/entrar', corpo)
         .then(function(r){ if(!r.conta.equipe){ telaSemAcesso(); return; } carregar(); })
-        .catch(function(err){ b.disabled = false; b.textContent = 'Entrar'; msg.textContent = err.message; });
+        .catch(function(err){
+          b.disabled = false; b.textContent = 'Entrar';
+          if(err.erro === 'precisa_2fa'){ p2.hidden = false; cd.focus(); return; }
+          if(err.erro === 'codigo_2fa') cd.value = '';
+          msg.textContent = err.message;
+        });
     });
     setTimeout(function(){ f.querySelector('#em').focus(); }, 50);
   }
@@ -113,6 +121,7 @@
       .then(function(r){ mostrar(r.reserva); })
       .catch(function(e){
         if(e.status === 401) telaEntrar();
+        else if(e.erro === 'configurar_2fa') erro('Antes de confirmar pelo celular, ative a verificação em duas etapas no painel da Casa. Leva 2 minutos.');
         else if(e.status === 403) telaSemAcesso();
         else erro(e.message);
       });

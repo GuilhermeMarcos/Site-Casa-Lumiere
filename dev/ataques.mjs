@@ -3,7 +3,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import { preparar } from './preparar.mjs';
+import { preparar, ligar2fa } from './preparar.mjs';
 import handler from '../api/index.js';
 import { agoraLocal, somarDias, diaSemana } from '../api/_lib/agenda.js';
 
@@ -45,6 +45,7 @@ test('preparação: vítima, atacante e equipe', async () => {
   assert.equal((await vitima('POST', '/api/auth/cadastro', { ...nova('vitima'), nome: 'Vítima Silva' })).status, 201);
   assert.equal((await atacante('POST', '/api/auth/cadastro', nova('atacante'))).status, 201);
   assert.equal((await equipe('POST', '/api/auth/cadastro', { ...nova('equipe'), email: 'equipe@casalumiere.com.br', codigoEquipe: 'lumiere' })).status, 201);
+  await ligar2fa(equipe);
   assert.equal((await vitima('POST', '/api/reservas', { sala: 'sala-02', data: dia, horas: [9, 10] })).status, 201);
 });
 
@@ -101,6 +102,7 @@ test('e-mail da equipe sem o código não cria conta, e chutar o código trava',
   // a equipe de verdade, de outro lugar, continua conseguindo
   const r = await equipe('POST', '/api/auth/cadastro', { ...nova('equipe'), email: 'equipe@casalumiere.com.br', codigoEquipe: 'lumiere' });
   assert.equal(r.status, 201);
+  await ligar2fa(equipe);
 });
 
 test('cookie de sessão falsificado ou adulterado não vale', async () => {

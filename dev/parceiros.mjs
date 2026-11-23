@@ -2,7 +2,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import { preparar, caixaDeEntrada } from './preparar.mjs';
+import { preparar, caixaDeEntrada, ligar2fa } from './preparar.mjs';
 import handler from '../api/index.js';
 import { usarCorreio } from '../api/_lib/correio.js';
 import { agoraLocal, somarDias, diaSemana } from '../api/_lib/agenda.js';
@@ -55,6 +55,7 @@ test('cálculo do total pela tabela de horas', () => {
 
 test('preparação: equipe, cliente comum e a parceira', async () => {
   assert.equal((await equipe('POST', '/api/auth/cadastro', { nome: 'Luiza e Agatha', email: 'equipe@casalumiere.com.br', telefone: '19992487347', senha: 'Casa-Forte-2026', codigoEquipe: 'lumiere' })).status, 201);
+  await ligar2fa(equipe);
   assert.equal((await comum('POST', '/api/auth/cadastro', { nome: 'Cliente Comum', email: 'comum@exemplo.com', telefone: '19990000001', senha: 'Senha-Comum-1' })).status, 201);
   assert.equal((await parceira('POST', '/api/auth/cadastro', { nome: 'Paula Parceira', email: 'paula@exemplo.com', telefone: '19990000002', senha: 'Senha-Paula-1' })).status, 201);
 });

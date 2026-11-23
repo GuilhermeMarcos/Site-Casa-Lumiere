@@ -2,7 +2,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import { preparar } from './preparar.mjs';
+import { preparar, ligar2fa, codigoApp } from './preparar.mjs';
 import handler from '../api/index.js';
 import { agoraLocal, somarDias, diaSemana, fixoOcupa } from '../api/_lib/agenda.js';
 
@@ -166,6 +166,7 @@ test('pré-reserva expira e o horário volta a ficar livre', async () => {
   assert.equal(minhas.dados.reservas[0].status, 'expirada');
 });
 
+let segredoEquipe;
 test('equipe: e-mail da equipe precisa do código', async () => {
   let r = await equipe('POST', '/api/auth/cadastro', { nome: 'Luiza e Agatha', email: 'equipe@casalumiere.com.br', telefone: '19992487347', senha: 'senha-da-casa' });
   assert.equal(r.status, 403);
@@ -173,6 +174,10 @@ test('equipe: e-mail da equipe precisa do código', async () => {
   r = await equipe('POST', '/api/auth/cadastro', { nome: 'Luiza e Agatha', email: 'equipe@casalumiere.com.br', telefone: '19992487347', senha: 'senha-da-casa', codigoEquipe: 'lumiere' });
   assert.equal(r.status, 201);
   assert.equal(r.dados.conta.equipe, true);
+  r = await equipe('GET', '/api/admin/dados');
+  assert.equal(r.status, 403, 'sem a verificação em duas etapas, o painel não abre');
+  assert.equal(r.dados.erro, 'configurar_2fa');
+  segredoEquipe = (await ligar2fa(equipe)).segredo;
   r = await ana('GET', '/api/admin/dados');
   assert.equal(r.status, 403, 'cliente não vê o painel');
 });
@@ -259,10 +264,18 @@ test('senhas: equipe redefine a de um cliente e a própria com o código', async
   assert.equal(r.status, 200);
   r = await anonimo('POST', '/api/auth/redefinir-equipe', { email: 'equipe@casalumiere.com.br', codigo: 'errado', senhaNova: 'nova-senha-casa' });
   assert.equal(r.status, 403);
-  r = await anonimo('POST', '/api/auth/redefinir-equipe', { email: 'equipe@casalumiere.com.br', codigo: 'lumiere', senhaNova: 'nova-senha-casa' });
+  r = await anonimo('POST', '/api/auth/redefinir-equipe', { email: 'equipe@casalumiere.com.br', codigo: 'lumiere', senhaNova: 'nova-senha-da-casa' });
+  assert.equal(r.status, 401, 'com a verificação ligada, só o código da equipe não basta');
+  r = await anonimo('POST', '/api/auth/redefinir-equipe', { email: 'equipe@casalumiere.com.br', codigo: 'lumiere', senhaNova: 'curta-123', codigo2fa: await codigoApp(segredoEquipe) });
+  assert.equal(r.status, 400, 'senha da equipe com menos de 12 caracteres');
+  r = await anonimo('POST', '/api/auth/redefinir-equipe', { email: 'equipe@casalumiere.com.br', codigo: 'lumiere', senhaNova: 'nova-senha-da-casa', codigo2fa: await codigoApp(segredoEquipe) });
   assert.equal(r.status, 200);
-  r = await cliente()('POST', '/api/auth/entrar', { email: 'equipe@casalumiere.com.br', senha: 'nova-senha-casa' });
+  const outro = cliente();
+  r = await outro('POST', '/api/auth/entrar', { email: 'equipe@casalumiere.com.br', senha: 'nova-senha-da-casa' });
+  assert.equal(r.status, 401); assert.equal(r.dados.erro, 'precisa_2fa');
+  r = await outro('POST', '/api/auth/entrar', { email: 'equipe@casalumiere.com.br', senha: 'nova-senha-da-casa', codigo2fa: await codigoApp(segredoEquipe) });
   assert.equal(r.status, 200);
+  assert.equal((await outro('GET', '/api/admin/dados')).status, 200);
 });
 
 test('pedido vindo de outro site é recusado', async () => {
