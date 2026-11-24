@@ -520,6 +520,12 @@ async function fotoSala(req, p, c) {
   return [200, { foto: url }];
 }
 
+/* ===== WhatsApp da Casa (o mesmo do painel, em Funcionamento) para os botões e o formulário de contato ===== */
+async function contatoPublico() {
+  const geral = geralDe(await q(...SQL_GERAL));
+  return [200, { whatsapp: soDigitos(geral.whatsappAgatha) }];
+}
+
 /* ===== Profissionais (página Profissionais e galeria do início) ===== */
 async function profissionaisPublico() {
   const lista = await q(`SELECT id, nome, especialidade, registro, whatsapp, foto_url AS foto, credito_foto AS credito
@@ -808,6 +814,7 @@ export const ROTAS = [
   ['PATCH', '/api/admin/salas/:id', editarSala],
   ['POST', '/api/admin/salas/:id/foto', fotoSala],
   ['GET', '/api/profissionais', profissionaisPublico],
+  ['GET', '/api/contato', contatoPublico],
   ['POST', '/api/admin/sair-todos', sairDeTodos],
   ['POST', '/api/admin/profissionais', criarProfissional],
   ['PATCH', '/api/admin/profissionais/:id', editarProfissional],

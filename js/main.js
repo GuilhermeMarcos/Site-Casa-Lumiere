@@ -1,11 +1,11 @@
 /* Casa Lumière */
 (function(){
   /* ===== CONFIGURAÇÃO =====
-     whatsapp: só números, com DDI 55 e DDD. Ex.: '5519999999999'
-     Enquanto estiver vazio, os botões de WhatsApp levam para a página de Contato.
+     whatsapp: o número que o site usa enquanto carrega. O número que vale é o do painel
+     (Funcionamento, "WhatsApp que recebe as mensagens"), lido logo em seguida em /api/contato.
      assinatura: link externo da Assinatura Lumière. */
   var CONFIG = {
-    whatsapp: '',
+    whatsapp: '5519992487347',
     assinatura: '',
     email: 'acasalumiere@gmail.com'
   };
@@ -15,12 +15,25 @@
   function guarda(fn){ try{ return fn(); }catch(e){ return null; } }
 
   /* Links de WhatsApp e da Assinatura */
-  function linkWhats(msg){ return 'https://wa.me/' + CONFIG.whatsapp + '?text=' + encodeURIComponent(msg || 'Olá! Vim pelo site da Casa Lumière.'); }
-  d.querySelectorAll('[data-wa]').forEach(function(a){
-    if(!CONFIG.whatsapp) return;
-    a.href = linkWhats(a.getAttribute('data-wa'));
-    a.target = '_blank'; a.rel = 'noopener';
-  });
+  function numeroWhats(){ var n = String(CONFIG.whatsapp || '').replace(/\D/g, ''); return n && n.length <= 11 ? '55' + n : n; }
+  function linkWhats(msg, web){
+    var texto = encodeURIComponent(msg || 'Olá! Vim pelo site da Casa Lumière.');
+    return web ? 'https://web.whatsapp.com/send?phone=' + numeroWhats() + '&text=' + texto : 'https://wa.me/' + numeroWhats() + '?text=' + texto;
+  }
+  function ligarBotoesWhats(){
+    d.querySelectorAll('[data-wa]').forEach(function(a){
+      if(!CONFIG.whatsapp) return;
+      a.href = linkWhats(a.getAttribute('data-wa'));
+      a.target = '_blank'; a.rel = 'noopener';
+    });
+  }
+  ligarBotoesWhats();
+  /* Se a equipe trocar o número no painel, o site inteiro passa a usar o novo */
+  if(d.querySelector('[data-wa], #form-contato')){
+    fetch('/api/contato', {credentials: 'same-origin'}).then(function(r){ return r.ok ? r.json() : null; }).then(function(r){
+      if(r && r.whatsapp && r.whatsapp !== CONFIG.whatsapp){ CONFIG.whatsapp = r.whatsapp; window.CL_WA = numeroWhats(); ligarBotoesWhats(); }
+    }).catch(function(){});
+  }
   d.querySelectorAll('[data-assinatura]').forEach(function(a){
     if(!CONFIG.assinatura) return;
     a.href = CONFIG.assinatura; a.target = '_blank'; a.rel = 'noopener';
@@ -108,13 +121,20 @@
       if(!nome || !fone || !msg){ retorno.textContent = 'Preencha nome, telefone e mensagem para enviar.'; return; }
       if(!form.aceite.checked){ retorno.textContent = 'Marque a caixa de concordância com os Termos e a Política de Privacidade.'; return; }
       var texto = 'Olá! Sou ' + nome + ' (' + fone + ').\n\n' + msg;
-      if(CONFIG.whatsapp){
-        window.open(linkWhats(texto), '_blank', 'noopener');
-        retorno.textContent = 'Abrimos o WhatsApp com a sua mensagem pronta. É só tocar em enviar.';
-      } else {
-        window.location.href = 'mailto:' + CONFIG.email + '?subject=' + encodeURIComponent('Contato pelo site') + '&body=' + encodeURIComponent(texto);
-        retorno.textContent = 'Abrimos o seu e-mail com a mensagem pronta para ' + CONFIG.email + '.';
-      }
+      /* A mensagem vai pronta para o WhatsApp da Casa: no aplicativo ou no WhatsApp Web (computador) */
+      retorno.textContent = '';
+      retorno.appendChild(d.createTextNode('Sua mensagem está pronta. Escolha por onde enviar e toque em enviar no WhatsApp:'));
+      var duas = d.createElement('div'); duas.className = 'duas-wa-contato';
+      [['WhatsApp', false, 'btn'], ['WhatsApp Web', true, 'btn btn-line']].forEach(function(o){
+        var a = d.createElement('a'); a.className = o[2]; a.href = linkWhats(texto, o[1]); a.target = '_blank'; a.rel = 'noopener'; a.textContent = o[0];
+        duas.appendChild(a);
+      });
+      retorno.appendChild(duas);
+      var alt = d.createElement('p'); alt.className = 'alt-email';
+      var em = d.createElement('a'); em.href = 'mailto:' + CONFIG.email + '?subject=' + encodeURIComponent('Contato pelo site') + '&body=' + encodeURIComponent(texto); em.textContent = 'enviar por e-mail';
+      alt.appendChild(d.createTextNode('Prefere e-mail? Toque para ')); alt.appendChild(em); alt.appendChild(d.createTextNode('.'));
+      retorno.appendChild(alt);
+      duas.firstChild.focus();
     });
   }
 

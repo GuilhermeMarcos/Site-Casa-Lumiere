@@ -145,8 +145,8 @@
     d.querySelector('.gaveta-abas').hidden = true;
     $('r-email').value = $('e-email').value; $('rc-email').value = $('e-email').value;
     var msg = 'Olá! Esqueci a senha da minha conta no site da Casa Lumière. Meu e-mail: ' + ($('e-email').value.trim() || '');
-    $('esq-wa').href = linkWhats(WA_CASA, msg);
-    $('esq-wa-web').href = linkWhats(WA_CASA, msg, true);
+    $('esq-wa').href = linkWhats(window.CL_WA || WA_CASA, msg);
+    $('esq-wa-web').href = linkWhats(window.CL_WA || WA_CASA, msg, true);
     /* Com o e-mail ligado, o código chega no e-mail; o WhatsApp fica como alternativa */
     $('f-recuperar').hidden = !emailAtivo;
     $('esq-txt-wa').textContent = emailAtivo ? 'Não recebeu o e-mail? Fale com a Casa:' : 'Fale com a Casa pelo WhatsApp. A equipe cria uma senha nova para você.';
