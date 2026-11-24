@@ -118,7 +118,9 @@
       e.preventDefault();
       var nome = form.nome.value.trim(), fone = form.telefone.value.trim(), msg = form.mensagem.value.trim();
       retorno.hidden = false;
-      if(!nome || !fone || !msg){ retorno.textContent = 'Preencha nome, telefone e mensagem para enviar.'; return; }
+      if(!nome || !fone || !msg){ retorno.textContent = 'Preencha nome, WhatsApp e mensagem para enviar.'; return; }
+      var dig = fone.replace(/\D/g, '').replace(/^0+/, ''); if(dig.length > 11 && dig.indexOf('55') === 0) dig = dig.slice(2);
+      if(dig.length < 10 || dig.length > 11){ retorno.textContent = 'Digite o WhatsApp com DDD, como (19) 99999-9999.'; form.telefone.focus(); return; }
       if(!form.aceite.checked){ retorno.textContent = 'Marque a caixa de concordância com os Termos e a Política de Privacidade.'; return; }
       var texto = 'Olá! Sou ' + nome + ' (' + fone + ').\n\n' + msg;
       /* A mensagem vai pronta para o WhatsApp da Casa: no aplicativo ou no WhatsApp Web (computador) */

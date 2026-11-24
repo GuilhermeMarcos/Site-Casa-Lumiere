@@ -105,7 +105,7 @@
     if(conta){
       $('pf-av').textContent = inicial(conta.nome); $('pf-nome').textContent = conta.nome; $('pf-email').textContent = conta.email || '';
       $('pf-equipe').hidden = !conta.equipe; $('pf-painel').hidden = !conta.equipe;
-      $('p-nome').value = conta.nome || ''; $('p-tel').value = conta.telefone || ''; $('p-esp').value = conta.especialidade || '';
+      $('p-nome').value = conta.nome || ''; $('p-tel').value = window.CLTelefone ? window.CLTelefone.formatar(conta.telefone || '') : (conta.telefone || ''); $('p-esp').value = conta.especialidade || '';
       $('p-atual').value = ''; $('p-nova').value = ''; $('p-senha').open = false;
       $('x-senha').value = ''; $('x-det').open = false; $('f-excluir').hidden = !!conta.equipe;
       $('gaveta-titulo').innerHTML = 'Minha <em>conta</em>';
@@ -228,7 +228,7 @@
   $('f-criar').addEventListener('submit', function(e){
     e.preventDefault(); msgForm('cr-msg', '');
     var nome = $('cr-nome').value.trim(), em = $('cr-email').value, tel = $('cr-tel').value.trim(), se = $('cr-senha').value;
-    var ok = checar([['cr-nome', nome.length >= 2, 'Digite o seu nome.'], ['cr-email', emailOk(em), 'Digite um e-mail válido.'], ['cr-tel', tel.replace(/\D/g, '').length >= 10, 'Digite o WhatsApp com DDD.'], ['cr-senha', se.length >= 8, 'A senha precisa ter pelo menos 8 caracteres.']]);
+    var ok = checar([['cr-nome', nome.length >= 2, 'Digite o seu nome.'], ['cr-email', emailOk(em), 'Digite um e-mail válido.'], ['cr-tel', tel.replace(/\D/g, '').length >= 10, 'Digite o WhatsApp com DDD, como (19) 99999-9999.'], ['cr-senha', se.length >= 8, 'A senha precisa ter pelo menos 8 caracteres.']]);
     var aceite = $('cr-aceite').checked; $('cr-aceite-msg').hidden = aceite; if(!aceite) ok = false;
     if(!ok) return;
     var f = this;
@@ -313,7 +313,7 @@
   $('f-perfil').addEventListener('submit', function(e){
     e.preventDefault(); msgForm('p-msg', '');
     var corpo = {nome: $('p-nome').value.trim(), telefone: $('p-tel').value.trim(), especialidade: $('p-esp').value.trim()};
-    if(!checar([['p-nome', corpo.nome.length >= 2, 'Digite o seu nome.'], ['p-tel', corpo.telefone.replace(/\D/g, '').length >= 10, 'Digite o WhatsApp com DDD.']])) return;
+    if(!checar([['p-nome', corpo.nome.length >= 2, 'Digite o seu nome.'], ['p-tel', corpo.telefone.replace(/\D/g, '').length >= 10, 'Digite o WhatsApp com DDD, como (19) 99999-9999.']])) return;
     if($('p-nova').value){
       if($('p-nova').value.length < 8){ checar([['p-nova', false, 'A senha nova precisa ter pelo menos 8 caracteres.']]); return; }
       corpo.senhaAtual = $('p-atual').value; corpo.senhaNova = $('p-nova').value;

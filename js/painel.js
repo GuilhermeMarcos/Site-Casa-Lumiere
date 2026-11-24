@@ -236,7 +236,7 @@
       var p = el('div', 'pessoa'); p.appendChild(d.createTextNode((r.nome || 'Sem nome') + (r.especialidade ? ', ' + r.especialidade : '') + (r.telefone ? ' · ' : '')));
       if(r.telefone){
         var texto = 'Olá, ' + (r.nome || '').split(' ')[0] + '! Aqui é da Casa Lumière, sobre a sua reserva da ' + nomeSala(r.sala) + ' em ' + diaLongo(r.data).toLowerCase() + ', ' + faixa(r.horas) + '.';
-        var a = el('a', null, r.telefone); a.href = linkWhats(r.telefone, texto); a.target = '_blank'; a.rel = 'noopener'; a.title = 'Abrir no WhatsApp'; p.appendChild(a);
+        var a = el('a', null, formatarTel(r.telefone)); a.href = linkWhats(r.telefone, texto); a.target = '_blank'; a.rel = 'noopener'; a.title = 'Abrir no WhatsApp'; p.appendChild(a);
         p.appendChild(d.createTextNode(' '));
         var w = el('a', 'link-web', 'WhatsApp Web'); w.href = linkWhats(r.telefone, texto, true); w.target = '_blank'; w.rel = 'noopener'; p.appendChild(w);
       }
@@ -327,7 +327,7 @@
       cs.appendChild(campo('Até', seletor('r-ate', hs.slice(1).map(function(h){ return [h, pad(h) + 'h']; }), fim)));
       cs.appendChild(campo('Nome', entrada('r-nome', 'text', r ? r.nome : '', {autocomplete:'off'})));
       cs.appendChild(campo('Especialidade', entrada('r-esp', 'text', r ? r.especialidade : '')));
-      cs.appendChild(campo('WhatsApp', entrada('r-tel', 'tel', r ? r.telefone : '', {inputmode:'tel'})));
+      cs.appendChild(campo('WhatsApp', entrada('r-tel', 'tel', r && r.telefone ? formatarTel(r.telefone) : '', {inputmode:'tel', placeholder:'(19) 99999-9999'})));
       cs.appendChild(campo('Situação', seletor('r-status', [['confirmada', 'Reservada'], ['pre', 'Pré-reserva']], r ? (r.status === 'confirmada' ? 'confirmada' : 'pre') : 'confirmada')));
       var opsParc = [['', 'Não é parceiro']].concat(st.parceiros.filter(function(p){ return p.ativo || (r && r.parceiroId === p.id); }).map(function(p){ return [p.id, p.nome + ' (' + String(p.descontoAluguel).replace('.', ',') + '% de desconto)']; }));
       cs.appendChild(campo('Parceiro', seletor('r-parc', opsParc, r ? (r.parceiroId || '') : '')));
@@ -508,7 +508,7 @@
         e.preventDefault(); msg.textContent = '';
         var dados = { nome: $('pro-nome').value.trim(), especialidade: $('pro-esp').value.trim(), registro: $('pro-reg').value.trim(), whatsapp: $('pro-tel').value.trim(), credito: $('pro-cred').value.trim() };
         if(dados.nome.length < 2){ msg.textContent = 'Digite o nome.'; return; }
-        var dig = dados.whatsapp.replace(/\D/g, ''); if(dig && (dig.length < 10 || dig.length > 13)){ msg.textContent = 'Digite o WhatsApp com DDD, ou deixe em branco.'; return; }
+        var dig = dados.whatsapp.replace(/\D/g, ''); if(dig && (dig.length < 10 || dig.length > 13)){ msg.textContent = 'Digite o WhatsApp com DDD, como (19) 99999-9999, ou deixe em branco.'; return; }
         var file = arq.files && arq.files[0];
         salvar.disabled = true; salvar.textContent = 'Salvando…';
         var pedido = x ? api('PATCH', '/api/admin/profissionais/' + x.id, dados).then(function(){ return x.id; })
@@ -892,7 +892,7 @@
     cs.appendChild(campo('Abre às', seletor('g-abre', horasDia, g.abre)));
     cs.appendChild(campo('Fecha às', seletor('g-fecha', horasDia, g.fecha)));
     cs.appendChild(campo('Reservas com até', seletor('g-dias', [[30, '30 dias de antecedência'], [60, '60 dias de antecedência'], [100, '100 dias de antecedência'], [180, '180 dias de antecedência']], g.diasAFrente)));
-    var tel = entrada('g-tel', 'tel', formatarTel(g.whatsappAgatha), {inputmode:'tel'});
+    var tel = entrada('g-tel', 'tel', formatarTel(g.whatsappAgatha), {inputmode:'tel', placeholder:'(19) 99999-9999'});
     cs.appendChild(campo('WhatsApp que recebe as pré-reservas', tel, null, 'Hoje: Agatha'));
     var cd = el('div', 'campo largo'); cd.appendChild(el('span', 'rot', 'Dias abertos'));
     var ds = el('div', 'dias-sem');
@@ -905,7 +905,7 @@
       e.preventDefault(); msg.textContent = ''; salvo.textContent = '';
       var abre = +$('g-abre').value, fecha = +$('g-fecha').value;
       if(fecha <= abre){ msg.textContent = 'O horário de fechar precisa ser depois do de abrir.'; return; }
-      var n = $('g-tel').value.replace(/\D/g, ''); if(n && n.length < 10){ msg.textContent = 'Digite o WhatsApp com DDD.'; return; }
+      var n = $('g-tel').value.replace(/\D/g, ''); if(n && n.length < 10){ msg.textContent = 'Digite o WhatsApp com DDD, como (19) 99999-9999.'; return; }
       if(n && n.length <= 11) n = '55' + n;
       var dias = Array.prototype.map.call(ds.querySelectorAll('input:checked'), function(c){ return +c.value; });
       if(!dias.length){ msg.textContent = 'Deixe pelo menos um dia aberto.'; return; }
@@ -915,7 +915,8 @@
     b.appendChild(f); s.appendChild(b);
     s.appendChild(blocoSenha());
   }
-  function formatarTel(n){ n = String(n || '').replace(/\D/g, ''); if(n.indexOf('55') === 0 && n.length > 11) n = n.slice(2); if(n.length === 11) return '(' + n.slice(0,2) + ') ' + n.slice(2,7) + '-' + n.slice(7); return n; }
+  /* Mesmo padrão dos campos de telefone: (19) 99999-9999, ou (19) 3333-4444 para fixo */
+  function formatarTel(n){ n = String(n || '').replace(/\D/g, ''); if(n.indexOf('55') === 0 && n.length > 11) n = n.slice(2); if(n.length === 11) return '(' + n.slice(0,2) + ') ' + n.slice(2,7) + '-' + n.slice(7); if(n.length === 10) return '(' + n.slice(0,2) + ') ' + n.slice(2,6) + '-' + n.slice(6); return n; }
 
   /* Senha de cliente esquecida: a equipe cria uma nova e manda pelo WhatsApp */
   function blocoSenha(){
