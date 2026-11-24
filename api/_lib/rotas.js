@@ -122,7 +122,7 @@ async function cadastro(req, _p, c) {
   const telefone = texto(c.telefone, 20), especialidade = texto(c.especialidade, 80), senha = String(c.senha || '');
   if (nome.length < 2) throw new Falha(400, 'nome', 'Digite o seu nome.');
   if (!emailOk(email)) throw new Falha(400, 'email', 'Digite um e-mail válido.');
-  if (!telefoneOk(telefone)) throw new Falha(400, 'telefone', 'Digite o WhatsApp com DDD.');
+  if (!telefoneOk(telefone)) throw new Falha(400, 'telefone', 'Digite o WhatsApp com DDD, como (19) 99999-9999.');
   checarSenhaNova(senha, email);
   isca(c);
   await limitar('cadastro|' + ipLimite(req), 10, 3600, 'Muitas contas criadas daqui em pouco tempo. Tente de novo mais tarde.');
@@ -270,7 +270,7 @@ async function atualizarEu(req, _p, c) {
   const telefone = c.telefone !== undefined ? texto(c.telefone, 20) : u.telefone;
   const especialidade = c.especialidade !== undefined ? texto(c.especialidade, 80) : u.especialidade;
   if (nome.length < 2) throw new Falha(400, 'nome', 'Digite o seu nome.');
-  if (!telefoneOk(telefone)) throw new Falha(400, 'telefone', 'Digite o WhatsApp com DDD.');
+  if (!telefoneOk(telefone)) throw new Falha(400, 'telefone', 'Digite o WhatsApp com DDD, como (19) 99999-9999.');
   let cab;
   if (c.senhaNova) {
     const nova = String(c.senhaNova);
@@ -630,7 +630,7 @@ async function salvarConfig(req, _p, c) {
   const diasAbertos = [...new Set((Array.isArray(c.diasAbertos) ? c.diasAbertos : []).map(Number))].filter((d) => d >= 0 && d <= 6).sort();
   if (!diasAbertos.length) throw new Falha(400, 'dias', 'Deixe pelo menos um dia aberto.');
   let w = soDigitos(c.whatsappAgatha);
-  if (w && w.length < 10) throw new Falha(400, 'whatsapp', 'Digite o WhatsApp com DDD.');
+  if (w && w.length < 10) throw new Falha(400, 'whatsapp', 'Digite o WhatsApp com DDD, como (19) 99999-9999.');
   if (w && w.length <= 11) w = '55' + w;
   const valor = { abre, fecha, diasAFrente, diasAbertos, whatsappAgatha: w };
   await q("INSERT INTO config (chave, valor) VALUES ('geral', $1) ON CONFLICT (chave) DO UPDATE SET valor = EXCLUDED.valor", [JSON.stringify(valor)]);

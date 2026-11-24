@@ -32,6 +32,7 @@
 <link rel="stylesheet" href="css/conta.css">
 <script src="js/inicio.js"></script>
 <script src="js/main.js" defer></script>
+<script src="js/telefone.js" defer></script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Início", "item": "https://casalumiere.com.br/"}, {"@type": "ListItem", "position": 2, "name": "Contato", "item": "https://casalumiere.com.br/contato.html"}]}</script>
 </head>
 <body>
@@ -83,7 +84,7 @@
     </div>
     <form id="form-contato" class="revelar" novalidate>
       <div class="campo"><label for="c-nome">Nome</label><input id="c-nome" name="nome" type="text" autocomplete="name" required></div>
-      <div class="campo"><label for="c-fone">Telefone ou WhatsApp</label><input id="c-fone" name="telefone" type="tel" autocomplete="tel" inputmode="tel" required></div>
+      <div class="campo"><label for="c-fone">WhatsApp</label><input id="c-fone" name="telefone" type="tel" autocomplete="tel" inputmode="tel" placeholder="(19) 99999-9999" required></div>
       <div class="campo"><label for="c-msg">Mensagem</label><textarea id="c-msg" name="mensagem" required></textarea></div>
       <label class="aceite" for="c-aceite"><input id="c-aceite" name="aceite" type="checkbox" required><span>Li e concordo com os <a href="termos-privacidade.html">Termos e a Política de Privacidade</a>.</span></label>
       <button class="btn btn-grande" type="submit">Enviar pelo WhatsApp <span aria-hidden="true">→</span></button>
@@ -190,7 +191,7 @@
     <div class="pf-painel"><a class="btn btn-grande" id="pf-painel" href="painel.html" hidden>Abrir o painel da Casa</a></div>
     <form id="f-perfil" novalidate>
       <div class="c-campo"><label for="p-nome">Nome</label><input id="p-nome" autocomplete="name"><p class="msg" id="p-nome-msg" hidden></p></div>
-      <div class="c-campo"><label for="p-tel">WhatsApp</label><input id="p-tel" type="tel" inputmode="tel" autocomplete="tel"><p class="msg" id="p-tel-msg" hidden></p></div>
+      <div class="c-campo"><label for="p-tel">WhatsApp</label><input id="p-tel" type="tel" inputmode="tel" autocomplete="tel" placeholder="(19) 99999-9999"><p class="msg" id="p-tel-msg" hidden></p></div>
       <div class="c-campo"><label for="p-esp">Especialidade <span>(opcional)</span></label><input id="p-esp"></div>
       <details class="esq-equipe" id="p-senha">
         <summary>Trocar a senha</summary>
