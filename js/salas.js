@@ -51,10 +51,15 @@
   }
   function valorPara(sala, n){
     var s = CONFIG.salas[sala]; var cheio = s ? calcularValor(s.precos, n) : null;
-    if(cheio == null || !st.parceria) return { valor: cheio, cheio: cheio };
-    return { valor: Math.round(Math.round(cheio * 100) * (100 - st.parceria.descontoAluguel) / 100) / 100, cheio: cheio };
+    return { valor: st.parceria ? null : cheio, cheio: cheio };
   }
   function pctTxt(v){ return String(v).replace('.', ',') + '%'; }
+  /* Parceiro não paga aluguel: só a porcentagem do procedimento. Para ele, o site não mostra valor em R$. */
+  function procTxt(pct){ return pctTxt(pct) + ' do procedimento'; }
+  function valorReserva(r){
+    if(r.parceiroId && r.valor == null) return procTxt(r.pctParceiro != null ? r.pctParceiro : (st.parceria ? st.parceria.pctAtendimento : 0));
+    return r.valor != null ? brl(r.valor) : 'A combinar';
+  }
   var dias = [], meses = [], hoje = agoraLocal().data;
   function montarDias(base){
     hoje = base;
@@ -166,21 +171,21 @@
     leg.querySelector('strong').textContent = s.nome; leg.querySelector('span').textContent = s.descricao || s.tipo;
     f.appendChild(leg);
     /* Preços pequenos no canto da foto */
-    if(s.precos && s.precos.length){
+    if(st.parceria){
+      var tp = d.createElement('div'); tp.className = 'precos-sala parceiro';
+      var tt = d.createElement('span'); tt.className = 'precos-tit'; tt.textContent = 'Parceiro'; tp.appendChild(tt);
+      var tl = d.createElement('span'); tl.className = 'precos-linha'; var tb = d.createElement('b'); tb.textContent = pctTxt(st.parceria.pctAtendimento);
+      tl.appendChild(tb); tl.appendChild(d.createTextNode(' do procedimento')); tp.appendChild(tl);
+      f.appendChild(tp);
+    } else if(s.precos && s.precos.length){
       var tag = d.createElement('div'); tag.className = 'precos-sala';
-      var parc = st.parceria && st.parceria.descontoAluguel > 0;
-      var tit = d.createElement('span'); tit.className = 'precos-tit'; tit.textContent = parc ? 'Seu preço de parceiro' : 'Aluguel'; tag.appendChild(tit);
+      var tit = d.createElement('span'); tit.className = 'precos-tit'; tit.textContent = 'Aluguel'; tag.appendChild(tit);
       s.precos.slice(0, 5).forEach(function(p){
         var l = d.createElement('span'); l.className = 'precos-linha';
         var h = d.createElement('b'); h.textContent = p.horas + 'h'; l.appendChild(h);
-        if(parc){
-          /* Parceiro vê o valor com desconto, com o valor cheio riscado ao lado */
-          var cheio = d.createElement('s'); cheio.textContent = brl(p.valor); l.appendChild(d.createTextNode(' ')); l.appendChild(cheio);
-          l.appendChild(d.createTextNode(' ' + brl(Math.round(Math.round(p.valor * 100) * (100 - st.parceria.descontoAluguel) / 100) / 100)));
-        } else l.appendChild(d.createTextNode(' ' + brl(p.valor)));
+        l.appendChild(d.createTextNode(' ' + brl(p.valor)));
         tag.appendChild(l);
       });
-      if(parc){ var pc = d.createElement('span'); pc.className = 'precos-parc'; pc.textContent = pctTxt(st.parceria.descontoAluguel) + ' de desconto no aluguel'; tag.appendChild(pc); }
       f.appendChild(tag);
     }
   }
@@ -254,11 +259,16 @@
   }
   function desenharDica(){
     var dica = $('conta-dica'); dica.textContent = '';
+    var como = d.querySelector('.pagamento strong');
+    if(como){
+      if(!como.dataset.original) como.dataset.original = como.textContent;
+      como.textContent = st.parceria ? 'O horário fica pré-reservado. Você envia os detalhes para a Casa Lumière pelo WhatsApp e a equipe confirma a reserva. Como parceiro, você não paga aluguel: repassa ' + procTxt(st.parceria.pctAtendimento) + '.' : como.dataset.original;
+    }
     var c = st.conta;
     if(c){
       dica.appendChild(d.createTextNode('Reservando como '));
       var b = d.createElement('strong'); b.textContent = c.nome; dica.appendChild(b);
-      dica.appendChild(d.createTextNode(c.telefone ? ', WhatsApp ' + c.telefone + '. ' : '. '));
+      dica.appendChild(d.createTextNode(c.telefone ? ', WhatsApp ' + telVisivel(c.telefone) + '. ' : '. '));
       var e = d.createElement('button'); e.type = 'button'; e.textContent = 'Alterar dados';
       e.addEventListener('click', function(){ window.CLConta && window.CLConta.abrir('perfil'); });
       dica.appendChild(e);
@@ -282,7 +292,7 @@
     } else {
       var dl = d.createElement('dl'); dl.className = 'linhas';
       var vp = valorPara(st.sala, st.sel.length);
-      var txtValor = vp.valor == null ? 'A combinar com a Casa Lumière' : brl(vp.valor) + (st.parceria && vp.cheio !== vp.valor ? ' (parceiro, ' + pctTxt(st.parceria.descontoAluguel) + ' de desconto)' : '');
+      var txtValor = st.parceria ? procTxt(st.parceria.pctAtendimento) : vp.valor == null ? 'A combinar com a Casa Lumière' : brl(vp.valor);
       [['Dia', diaLongo(st.data)], ['Horário', faixa(st.sel)], ['Total', st.sel.length + (st.sel.length === 1 ? ' hora' : ' horas')], ['Valor', txtValor]].forEach(function(l){
         var div = d.createElement('div'); var dt = d.createElement('dt'); dt.textContent = l[0]; var dd = d.createElement('dd'); dd.textContent = l[1]; div.appendChild(dt); div.appendChild(dd); dl.appendChild(div);
       });
@@ -329,14 +339,14 @@
     if(!st.extrato) return;
     var p = st.extrato.parceria;
     var h = d.createElement('h3'); h.innerHTML = 'Sua <em>parceria</em>'; box.appendChild(h);
-    var reg = d.createElement('p'); reg.className = 'extrato-regra'; reg.textContent = pctTxt(p.descontoAluguel) + ' de desconto no aluguel · ' + pctTxt(p.pctAtendimento) + ' dos atendimentos para a Casa'; box.appendChild(reg);
+    var reg = d.createElement('p'); reg.className = 'extrato-regra'; reg.textContent = 'Você não paga aluguel da sala: repassa ' + procTxt(p.pctAtendimento) + ' para a Casa.'; box.appendChild(reg);
     if(!st.extrato.meses.length){ var v = d.createElement('p'); v.className = 'extrato-vazio'; v.textContent = 'Os atendimentos que a equipe lançar aparecem aqui, mês a mês.'; box.appendChild(v); return; }
     var tab = d.createElement('table'); tab.className = 'extrato-tab';
-    tab.innerHTML = '<thead><tr><th scope="col">Mês</th><th scope="col">Aluguel</th><th scope="col">Atendimentos</th><th scope="col">Repasse</th><th scope="col">A pagar</th></tr></thead><tbody></tbody>';
+    tab.innerHTML = '<thead><tr><th scope="col">Mês</th><th scope="col">Atendimentos</th><th scope="col">Repasse</th><th scope="col">A pagar</th></tr></thead><tbody></tbody>';
     st.extrato.meses.forEach(function(m){
       var tr = d.createElement('tr');
-      [cap(fmtMesAno.format(deChave(m.mes + '-01'))), brl(m.aluguel), m.atendimentos + ' (' + brl(m.valorAtendimentos) + ')', brl(m.repasse), m.repassePendente ? brl(m.repassePendente) : 'Em dia'].forEach(function(t, i){
-        var c = d.createElement(i ? 'td' : 'th'); if(!i) c.scope = 'row'; c.textContent = t; c.setAttribute('data-rotulo', ['Mês', 'Aluguel', 'Atendimentos', 'Repasse', 'A pagar'][i]); tr.appendChild(c);
+      [cap(fmtMesAno.format(deChave(m.mes + '-01'))), m.atendimentos + ' (' + brl(m.valorAtendimentos) + ')', brl(m.repasse), m.repassePendente ? brl(m.repassePendente) : 'Em dia'].forEach(function(t, i){
+        var c = d.createElement(i ? 'td' : 'th'); if(!i) c.scope = 'row'; c.textContent = t; c.setAttribute('data-rotulo', ['Mês', 'Atendimentos', 'Repasse', 'A pagar'][i]); tr.appendChild(c);
       });
       tab.querySelector('tbody').appendChild(tr);
     });
@@ -365,9 +375,9 @@
       var i = indicePorId(r.sala), sala = CONFIG.salas[i];
       li.querySelector('.r-arco').textContent = sala ? sala.nome.replace('Sala ', '') : '';
       li.querySelector('h3').textContent = nomeSalaId(r.sala);
-      li.querySelector('p').textContent = cap(diaLongo(r.data)) + ', ' + faixa(r.horas) + (r.valor != null ? ' · ' + brl(r.valor) : '');
+      li.querySelector('p').textContent = cap(diaLongo(r.data)) + ', ' + faixa(r.horas) + (r.valor != null || r.parceiroId ? ' · ' + valorReserva(r) : '');
       var stt = li.querySelector('.status'), acoes = li.querySelector('.acoes');
-      var msg = msgAgatha(r.sala, r.data, r.horas, r.nome, r.especialidade, r.telefone, r.valor, r.descontoPct, r.id);
+      var msg = msgAgatha(r.sala, r.data, r.horas, r.nome, r.especialidade, r.telefone, valorReserva(r), r.id);
       if(r.status === 'confirmada'){
         stt.className = 'status ok'; stt.textContent = 'Reservada';
         acoes.appendChild(botaoWhats('Olá, Casa Lumière! Sobre a minha reserva da ' + nomeSalaId(r.sala) + ' em ' + diaLongo(r.data) + ', ' + faixa(r.horas) + ':', 'Falar com a Casa'));
@@ -419,15 +429,15 @@
 
   /* ===== Mensagem para a Agatha ===== */
   var ICONE_WA = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5C6.5 2.5 2.2 6.4 2.2 11.2c0 2.6 1.2 4.9 3.2 6.5L4.5 21.5l4.4-2.2c1 .3 2 .4 3.1.4 5.5 0 9.8-3.9 9.8-8.6S17.5 2.5 12 2.5z"/></svg>';
-  function msgAgatha(salaId, data, horas, nome, esp, tel, valor, descontoPct, reservaId){
+  function msgAgatha(salaId, data, horas, nome, esp, tel, valorTexto, reservaId){
     var linhas = ['Olá, Casa Lumière! Fiz uma pré-reserva pelo site:', '',
       'Sala: ' + nomeSalaId(salaId),
       'Dia: ' + diaLongo(data),
       'Horário: ' + faixa(horas) + ' (' + horas.length + (horas.length === 1 ? ' hora)' : ' horas)'),
-      'Valor: ' + (valor != null ? brl(valor) + (descontoPct ? ' (parceiro, ' + pctTxt(descontoPct) + ' de desconto)' : '') : 'a combinar'),
+      'Valor: ' + (valorTexto === 'A combinar' ? 'a combinar' : valorTexto) + (/procedimento/.test(valorTexto) ? ' (parceiro)' : ''),
       'Nome: ' + nome];
     if(esp) linhas.push('Especialidade: ' + esp);
-    linhas.push('WhatsApp: ' + tel, '', 'Pode confirmar a reserva e me dizer como faço o pagamento?');
+    linhas.push('WhatsApp: ' + telVisivel(tel), '', /procedimento/.test(valorTexto) ? 'Pode confirmar a reserva?' : 'Pode confirmar a reserva e me dizer como faço o pagamento?');
     /* Link de 1 clique para a Agatha confirmar. Só funciona com a conta da equipe; para o cliente não faz nada. */
     if(reservaId) linhas.push('', 'Para a equipe confirmar: ' + location.origin + '/confirmar.html?r=' + encodeURIComponent(reservaId));
     return linhas.join('\n');
@@ -438,7 +448,7 @@
       ? 'https://web.whatsapp.com/send?phone=' + CONFIG.whatsappAgatha + '&text=' + encodeURIComponent(msg)
       : 'https://wa.me/' + CONFIG.whatsappAgatha + '?text=' + encodeURIComponent(msg);
   }
-  function telVisivel(n){ n = String(n || '').replace(/\D/g, ''); if(n.indexOf('55') === 0 && n.length > 11) n = n.slice(2); return n.length === 11 ? '(' + n.slice(0,2) + ') ' + n.slice(2,7) + '-' + n.slice(7) : n; }
+  function telVisivel(n){ n = String(n || '').replace(/\D/g, ''); if(n.indexOf('55') === 0 && n.length > 11) n = n.slice(2); return n.length === 11 ? '(' + n.slice(0,2) + ') ' + n.slice(2,7) + '-' + n.slice(7) : n.length === 10 ? '(' + n.slice(0,2) + ') ' + n.slice(2,6) + '-' + n.slice(6) : n; }
   function botaoWhats(msg, rotulo){
     var par = d.createElement('span'); par.className = 'par-wa';
     var a = d.createElement('a'); a.className = 'btn-wa'; a.href = linkAgatha(msg); a.target = '_blank'; a.rel = 'noopener';
@@ -452,13 +462,13 @@
     var f = d.createElement('div'); f.className = 'pre-fundo';
     f.innerHTML = '<div class="pre-caixa" role="dialog" aria-modal="true" aria-labelledby="pre-titulo"><img class="mono-pre" alt=""><h2 id="pre-titulo">Horário <em>pré-reservado</em></h2><p class="pre-txt"></p><dl></dl><p class="enviar-por">Enviar para a Casa Lumière pelo</p><div class="duas-wa"><a class="btn btn-grande wa-app" target="_blank" rel="noopener"></a><a class="btn btn-grande wa-web" target="_blank" rel="noopener">WhatsApp Web</a></div><p class="num-agatha"></p><button type="button" class="depois">Enviar depois</button></div>';
     f.querySelector('.mono-pre').src = MONO;
-    f.querySelector('.pre-txt').textContent = 'Para garantir, envie os detalhes para a Casa Lumière. A equipe combina o pagamento com você e confirma a reserva. Sem confirmação, o horário volta a ficar livre em ' + EXPIRA_TXT + '.';
+    f.querySelector('.pre-txt').textContent = (r.parceiroId ? 'Para garantir, envie os detalhes para a Casa Lumière e a equipe confirma a reserva.' : 'Para garantir, envie os detalhes para a Casa Lumière. A equipe combina o pagamento com você e confirma a reserva.') + ' Sem confirmação, o horário volta a ficar livre em ' + EXPIRA_TXT + '.';
     f.querySelector('.num-agatha').textContent = 'Casa Lumière: ' + telVisivel(CONFIG.whatsappAgatha);
     var dl = f.querySelector('dl');
-    [['Sala', nomeSalaId(r.sala)], ['Dia', diaLongo(r.data)], ['Horário', faixa(r.horas)], ['Valor', r.valor != null ? brl(r.valor) : 'A combinar']].forEach(function(l){
+    [['Sala', nomeSalaId(r.sala)], ['Dia', diaLongo(r.data)], ['Horário', faixa(r.horas)], ['Valor', valorReserva(r)]].forEach(function(l){
       var div = d.createElement('div'), dt = d.createElement('dt'), dd = d.createElement('dd'); dt.textContent = l[0]; dd.textContent = l[1]; div.appendChild(dt); div.appendChild(dd); dl.appendChild(div);
     });
-    var texto = msgAgatha(r.sala, r.data, r.horas, r.nome, r.especialidade, r.telefone, r.valor, r.descontoPct, r.id);
+    var texto = msgAgatha(r.sala, r.data, r.horas, r.nome, r.especialidade, r.telefone, valorReserva(r), r.id);
     var btn = f.querySelector('.wa-app'), web = f.querySelector('.wa-web');
     btn.href = linkAgatha(texto); btn.innerHTML = ICONE_WA + 'WhatsApp';
     web.href = linkAgatha(texto, true);

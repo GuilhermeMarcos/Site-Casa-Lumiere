@@ -89,15 +89,16 @@ test('a equipe cadastra a parceira; com o e-mail sem verificação, o desconto s
   assert.equal(r.status, 200);
   d = await equipe('GET', '/api/admin/dados');
   assert.equal(d.dados.parceiros.find((p) => p.id === idParceira).conta, 'conferida');
-  assert.deepEqual((await parceira('GET', '/api/agenda')).dados.parceria, { descontoAluguel: 30, pctAtendimento: 20 });
+  assert.deepEqual((await parceira('GET', '/api/agenda')).dados.parceria, { pctAtendimento: 20 }, 'o site recebe só a porcentagem do procedimento');
 });
 
-test('a parceira paga o aluguel com desconto', async () => {
+test('a parceira não paga aluguel: a reserva sai sem valor, com a porcentagem do procedimento', async () => {
   const r = await parceira('POST', '/api/reservas', { sala: 'sala-02', data: dia, horas: [14, 15, 16, 17] });
   assert.equal(r.status, 201);
-  assert.equal(r.dados.reserva.valorCheio, 180);
-  assert.equal(r.dados.reserva.valor, 126, '180 com 30% de desconto');
-  assert.equal(r.dados.reserva.descontoPct, 30);
+  assert.equal(r.dados.reserva.valorCheio, 180, 'o preço normal fica guardado só para referência');
+  assert.equal(r.dados.reserva.valor, null);
+  assert.equal(r.dados.reserva.pctParceiro, 20);
+  assert.ok(r.dados.reserva.parceiroId);
   const outras = (await comum('GET', '/api/agenda')).dados;
   assert.equal(outras.parceria, null, 'a parceria de uma não aparece para outra pessoa');
 });
@@ -122,7 +123,7 @@ test('com o e-mail confirmado por código, a parceria vale direto', async () => 
   await nova('POST', '/api/auth/codigo', { email: 'rita@exemplo.com', finalidade: 'cadastro' });
   const codigo = /(\d{6})/.exec([...caixaDeEntrada].reverse().find((m) => m.para === 'rita@exemplo.com').assunto)[1];
   assert.equal((await nova('POST', '/api/auth/cadastro', { nome: 'Rita', email: 'rita@exemplo.com', telefone: '19990000004', senha: 'Senha-Rita-1', codigo })).status, 201);
-  assert.deepEqual((await nova('GET', '/api/agenda')).dados.parceria, { descontoAluguel: 50, pctAtendimento: 15 });
+  assert.deepEqual((await nova('GET', '/api/agenda')).dados.parceria, { pctAtendimento: 15 });
   usarCorreio(null);
 });
 
@@ -180,7 +181,8 @@ test('a equipe lança uma reserva de parceiro pelo painel e pode ajustar o valor
   let r = await equipe('POST', '/api/admin/reservas', { sala: 'sala-02', data: dia, horas: [18, 19], nome: 'Paula', parceiro: paula.id, status: 'confirmada' });
   assert.equal(r.status, 201);
   let res = (await equipe('GET', '/api/admin/dados')).dados.reservas.find((x) => x.id === r.dados.id);
-  assert.equal(res.valor, 70, '2h = 100, com 30% de desconto');
+  assert.equal(res.valor, null, 'parceiro: sem aluguel');
+  assert.equal(res.pctParceiro, 20);
   r = await equipe('PATCH', '/api/admin/reservas/' + res.id, { sala: 'sala-02', data: dia, horas: [18, 19], nome: 'Paula', parceiro: paula.id, valor: '65.5', status: 'confirmada' });
   assert.equal(r.status, 200);
   res = (await equipe('GET', '/api/admin/dados')).dados.reservas.find((x) => x.id === res.id);

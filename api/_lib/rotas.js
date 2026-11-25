@@ -12,7 +12,7 @@ import { criarCodigo, usarCodigo } from './codigos.js';
 import { agoraLocal, dataValida, diaSemana, somarDias, fixoOcupa, horasValidas } from './agenda.js';
 import { GERAL_PADRAO } from './esquema.js';
 import { guardarFoto } from './armazenamento.js';
-import { validarPrecos, calcularValor, comDesconto, porcentagem, dinheiro } from './precos.js';
+import { validarPrecos, calcularValor, porcentagem, dinheiro } from './precos.js';
 
 const EXPIRA_MIN = 90;          // pré-reserva sem confirmação expira em 1h30
 const MAX_PRE_POR_CLIENTE = 3;  // pré-reservas abertas ao mesmo tempo por conta
@@ -28,7 +28,8 @@ const SQL_SALAS = ['SELECT id, nome, tipo, descricao, foto_url AS foto, disponiv
 const SQL_FIXOS = ['SELECT id, sala, repete, dia_semana AS "diaSemana", a_cada_dias AS "aCadaDias", de, ate, desde::text AS desde FROM fixos ORDER BY sala, de'];
 const COLS_RESERVA = `r.id, r.sala, r.data::text AS data, r.horas, r.nome, r.especialidade, r.telefone, r.status, r.origem,
   r.expira_em AS "expiraEm", r.criado_em AS "criadoEm", r.confirmada_em AS "confirmadaEm",
-  r.valor::float8 AS valor, r.valor_cheio::float8 AS "valorCheio", r.desconto_pct::float8 AS "descontoPct", r.parceiro_id AS "parceiroId"`;
+  r.valor::float8 AS valor, r.valor_cheio::float8 AS "valorCheio", r.desconto_pct::float8 AS "descontoPct", r.parceiro_id AS "parceiroId",
+  (SELECT pa.pct_atendimento::float8 FROM parceiros pa WHERE pa.id = r.parceiro_id) AS "pctParceiro"`;
 const COLS_PARCEIRO = `p.id, p.email, p.nome, p.desconto_aluguel::float8 AS "descontoAluguel", p.pct_atendimento::float8 AS "pctAtendimento",
   p.ativo, p.observacao`;
 const COLS_ATENDIMENTO = `a.id, a.parceiro_id AS "parceiroId", a.reserva_id AS "reservaId", a.data::text AS data, a.quantidade,
@@ -46,11 +47,11 @@ async function parceriaDe(u) {
   return p && p.valida ? p : null;
 }
 
-// Valor da reserva calculado no servidor (o navegador só mostra; nunca decide o preço)
+// Valor da reserva calculado no servidor (o navegador só mostra; nunca decide o preço).
+// Parceiro não paga aluguel: paga a porcentagem do procedimento (lançada depois em Atendimentos). A reserva fica sem valor.
 function precoDaReserva(sala, nHoras, parceria) {
   const cheio = calcularValor(sala.precos, nHoras);
-  const desc = parceria ? Number(parceria.descontoAluguel) : null;
-  return { valor: parceria ? comDesconto(cheio, desc) : cheio, valorCheio: cheio, descontoPct: desc, parceiroId: parceria ? parceria.id : null };
+  return { valor: parceria ? null : cheio, valorCheio: cheio, descontoPct: null, parceiroId: parceria ? parceria.id : null };
 }
 
 const geralDe = (linhas) => ({ ...GERAL_PADRAO, ...((linhas[0] && linhas[0].valor) || {}) });
@@ -113,7 +114,7 @@ async function agenda(req) {
 
 async function parceriaPublica(u) {
   const p = await parceriaDe(u);
-  return p ? { descontoAluguel: p.descontoAluguel, pctAtendimento: p.pctAtendimento } : null;
+  return p ? { pctAtendimento: p.pctAtendimento } : null;
 }
 
 /* ===== Conta ===== */
@@ -783,7 +784,7 @@ async function minhaParceria(req) {
   const lista = Object.values(meses).sort((x, y) => (x.mes < y.mes ? 1 : -1))
     .map((m) => Object.fromEntries(Object.entries(m).map(([k, v]) => [k, typeof v === 'number' ? Math.round(v * 100) / 100 : v])));
   return [200, {
-    parceria: { nome: p.nome, descontoAluguel: p.descontoAluguel, pctAtendimento: p.pctAtendimento },
+    parceria: { nome: p.nome, pctAtendimento: p.pctAtendimento },
     meses: lista,
     atendimentos: atend.map(({ parceiroId, reservaId, ...a }) => a),
   }];

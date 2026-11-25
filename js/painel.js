@@ -37,7 +37,6 @@
     var m = [0]; for(var i = 1; i <= n; i++){ m[i] = Infinity; precos.forEach(function(p){ if(p.horas <= i && m[i - p.horas] + Math.round(p.valor * 100) < m[i]) m[i] = m[i - p.horas] + Math.round(p.valor * 100); }); }
     return isFinite(m[n]) ? m[n] / 100 : null;
   }
-  function comDesconto(v, pct){ return v == null ? null : Math.round(Math.round(v * 100) * (100 - (pct || 0)) / 100) / 100; }
   function faixa(horas){ horas = (horas || []).slice().sort(function(a,b){return a-b;}); if(!horas.length) return ''; var out = [], i0 = horas[0], f = horas[0];
     for(var i = 1; i <= horas.length; i++){ if(horas[i] === f + 1) f = horas[i]; else { out.push(i0 + 'h às ' + (f + 1) + 'h'); i0 = f = horas[i]; } } return out.join(', '); }
 
@@ -244,8 +243,8 @@
       var chip = el('span', 'chip ' + ({confirmada:'ok', pre:'pre', expirada:'exp'})[r.status], ({confirmada:'Reservada', pre:'Pré-reserva', expirada:'Pré-reserva expirou'})[r.status]); meio.appendChild(chip);
       if(r.status === 'pre' && r.expiraEm){ meio.appendChild(el('span', 'expira', 'Vale até ' + fmtHora.format(new Date(r.expiraEm)))); }
       if(r.origem === 'painel') meio.appendChild(el('span', 'origem', 'Feita pelo painel'));
-      var vl = el('span', 'valor-res', r.valor != null ? brl(r.valor) : 'Valor a combinar');
-      if(r.parceiroId){ var pc = parceiroPorId(r.parceiroId); vl.appendChild(el('small', null, ' parceiro' + (pc ? ' ' + pc.nome.split(' ')[0] : '') + (r.descontoPct ? ', ' + String(r.descontoPct).replace('.', ',') + '% de desconto' : ''))); }
+      var vl = el('span', 'valor-res', r.valor != null ? brl(r.valor) : r.parceiroId ? pctTxt(r.pctParceiro != null ? r.pctParceiro : 0) + ' do procedimento' : 'Valor a combinar');
+      if(r.parceiroId){ var pc = parceiroPorId(r.parceiroId); vl.appendChild(el('small', null, ' parceiro' + (pc ? ' ' + pc.nome.split(' ')[0] : ''))); }
       meio.appendChild(vl);
       li.appendChild(meio);
       var ac = el('div', 'acoes');
@@ -329,7 +328,7 @@
       cs.appendChild(campo('Especialidade', entrada('r-esp', 'text', r ? r.especialidade : '')));
       cs.appendChild(campo('WhatsApp', entrada('r-tel', 'tel', r && r.telefone ? formatarTel(r.telefone) : '', {inputmode:'tel', placeholder:'(19) 99999-9999'})));
       cs.appendChild(campo('Situação', seletor('r-status', [['confirmada', 'Reservada'], ['pre', 'Pré-reserva']], r ? (r.status === 'confirmada' ? 'confirmada' : 'pre') : 'confirmada')));
-      var opsParc = [['', 'Não é parceiro']].concat(st.parceiros.filter(function(p){ return p.ativo || (r && r.parceiroId === p.id); }).map(function(p){ return [p.id, p.nome + ' (' + String(p.descontoAluguel).replace('.', ',') + '% de desconto)']; }));
+      var opsParc = [['', 'Não é parceiro']].concat(st.parceiros.filter(function(p){ return p.ativo || (r && r.parceiroId === p.id); }).map(function(p){ return [p.id, p.nome + ' (' + pctTxt(p.pctAtendimento) + ' do procedimento)']; }));
       cs.appendChild(campo('Parceiro', seletor('r-parc', opsParc, r ? (r.parceiroId || '') : '')));
       var iVal = entrada('r-valor', 'text', '', {inputmode:'decimal', placeholder:'0,00'});
       var pv = el('div', 'prefixo'); pv.appendChild(el('span', null, 'R$')); pv.appendChild(iVal);
@@ -338,9 +337,13 @@
       function valorAuto(){
         var sala = salaPorId($('r-sala').value), n = (+$('r-ate').value) - (+$('r-de').value), pc = parceiroPorId($('r-parc').value);
         var cheio = sala ? calcularValor(sala.precos, n) : null;
-        return pc ? comDesconto(cheio, pc.descontoAluguel) : cheio;
+        return pc ? null : cheio;
       }
-      function mostrarAuto(){ var v = valorAuto(); ajudaVal.textContent = 'Em branco: ' + (v != null ? brl(v) + ' pela tabela da sala' : 'a tabela da sala não tem preço para essas horas') + '.'; }
+      function mostrarAuto(){
+        var pc = parceiroPorId($('r-parc').value), v = valorAuto();
+        if(pc){ ajudaVal.textContent = 'Parceiro não paga aluguel: repassa ' + pctTxt(pc.pctAtendimento) + ' do procedimento. Deixe em branco.'; return; }
+        ajudaVal.textContent = 'Em branco: ' + (v != null ? brl(v) + ' pela tabela da sala' : 'a tabela da sala não tem preço para essas horas') + '.';
+      }
       if(r && r.valor != null && r.valor !== valorAuto()) iVal.value = emReais(r.valor);
       ['r-sala', 'r-de', 'r-ate', 'r-parc'].forEach(function(id){ cs.querySelector('#' + id).addEventListener('change', mostrarAuto); });
       setTimeout(mostrarAuto, 0);
@@ -577,7 +580,7 @@
     return { el: caixa, ler: ler };
   }
 
-  /* ===== Parceiros: desconto no aluguel e porcentagem dos atendimentos ===== */
+  /* ===== Parceiros: não pagam aluguel, repassam uma porcentagem do procedimento ===== */
   function parceiroPorId(id){ return st.parceiros.filter(function(p){ return p.id === id; })[0]; }
   function pctTxt(v){ return String(v).replace('.', ',') + '%'; }
   function aReceber(){ return st.atendimentos.filter(function(a){ return a.status === 'pendente'; }).reduce(function(t, a){ return t + a.repasse; }, 0); }
@@ -586,7 +589,7 @@
   var CONTA = {
     verificada: ['ok', 'Conta verificada pelo e-mail'],
     conferida: ['ok', 'Conta conferida pela equipe'],
-    nao_verificada: ['pre', 'Conta sem verificação: o desconto ainda não vale'],
+    nao_verificada: ['pre', 'Conta sem verificação: a condição de parceiro ainda não vale'],
     sem_conta: ['exp', 'Ainda não criou conta no site']
   };
   function telaParceiros(s){
@@ -601,10 +604,10 @@
     });
     s.appendChild(nums);
 
-    var b = bloco('Parceiros', 'Pagam o aluguel com desconto e repassam uma porcentagem dos atendimentos feitos na sala');
+    var b = bloco('Parceiros', 'Não pagam aluguel: repassam uma porcentagem de cada procedimento feito na sala');
     var novo = el('button', 'btn', 'Novo parceiro'); novo.type = 'button'; novo.addEventListener('click', function(){ formParceiro(null); });
     b.querySelector('.bloco-cab').appendChild(novo);
-    if(!st.parceiros.length) b.appendChild(vazio('Nenhum parceiro ainda', 'Cadastre o e-mail e o nome da pessoa, o desconto no aluguel e a porcentagem dos atendimentos. O desconto vale quando ela reservar com a conta desse e-mail.'));
+    if(!st.parceiros.length) b.appendChild(vazio('Nenhum parceiro ainda', 'Cadastre o nome, o e-mail da conta da pessoa no site e a porcentagem do procedimento. A condição vale quando ela reservar com a conta desse e-mail.'));
     var ul = el('ul', 'lista');
     st.parceiros.forEach(function(p){
       var li = el('li', 'parc' + (p.ativo ? '' : ' off'));
@@ -612,8 +615,8 @@
       meio.appendChild(el('div', 'sala-nome', p.nome));
       meio.appendChild(el('div', 'pessoa', p.email));
       var regras = el('div', 'regras');
-      regras.appendChild(el('span', null, pctTxt(p.descontoAluguel) + ' de desconto no aluguel'));
-      regras.appendChild(el('span', null, pctTxt(p.pctAtendimento) + ' dos atendimentos para a Casa'));
+      regras.appendChild(el('span', null, pctTxt(p.pctAtendimento) + ' do procedimento para a Casa'));
+      regras.appendChild(el('span', null, 'Sem aluguel'));
       meio.appendChild(regras);
       var cc = CONTA[p.conta] || CONTA.sem_conta; meio.appendChild(el('span', 'chip ' + cc[0], p.ativo ? cc[1] : 'Parceria desativada'));
       if(p.observacao) meio.appendChild(el('p', 'obs', p.observacao));
@@ -623,9 +626,9 @@
       var ac = el('div', 'acoes');
       if(p.ativo){ var la = el('button', 'btn', 'Lançar atendimentos'); la.type = 'button'; la.addEventListener('click', function(){ formAtendimento(null, p.id); }); ac.appendChild(la); }
       if(p.ativo && p.conta === 'nao_verificada'){
-        var cf = el('button', 'btn-borda', 'É ela mesma: liberar desconto'); cf.type = 'button';
+        var cf = el('button', 'btn-borda', 'É ela mesma: liberar parceria'); cf.type = 'button';
         cf.title = 'Use depois de confirmar com a pessoa que a conta com este e-mail é dela';
-        cf.addEventListener('click', function(){ escrever('p' + p.id, function(){ return api('PATCH', '/api/admin/parceiros/' + p.id, {conferirConta: true}); }).then(function(ok){ if(ok) toast('Conta de ' + p.nome + ' conferida. O desconto já vale.'); }); });
+        cf.addEventListener('click', function(){ escrever('p' + p.id, function(){ return api('PATCH', '/api/admin/parceiros/' + p.id, {conferirConta: true}); }).then(function(ok){ if(ok) toast('Conta de ' + p.nome + ' conferida. A condição de parceiro já vale no site.'); }); });
         ac.appendChild(cf);
       }
       var ed = el('button', 'btn-texto', 'Editar'); ed.type = 'button'; ed.addEventListener('click', function(){ formParceiro(p); }); ac.appendChild(ed);
@@ -699,10 +702,9 @@
     abrirJanela(p ? 'Editar parceiro' : 'Novo parceiro', function(j, fechar){
       var f = el('form'); f.noValidate = true; var cs = el('div', 'campos');
       cs.appendChild(campo('Nome', entrada('pa-nome', 'text', p ? p.nome : '', {autocomplete:'off'})));
-      cs.appendChild(campo('E-mail da conta no site', entrada('pa-email', 'email', p ? p.email : '', {autocomplete:'off', inputmode:'email'}), null, 'O desconto vale quando ela reservar com a conta deste e-mail.'));
-      var d1 = entrada('pa-desc', 'text', p ? emReais(p.descontoAluguel) : '', {inputmode:'decimal', placeholder:'Ex.: 30'});
-      var d2 = entrada('pa-pct', 'text', p ? emReais(p.pctAtendimento) : '', {inputmode:'decimal', placeholder:'Ex.: 20'});
-      cs.appendChild(campo('Desconto no aluguel (%)', d1)); cs.appendChild(campo('Porcentagem dos atendimentos (%)', d2));
+      cs.appendChild(campo('E-mail da conta no site', entrada('pa-email', 'email', p ? p.email : '', {autocomplete:'off', inputmode:'email'}), null, 'A condição de parceiro vale quando ela reservar com a conta deste e-mail.'));
+      var d2 = entrada('pa-pct', 'text', p ? emReais(p.pctAtendimento) : '', {inputmode:'decimal', placeholder:'Ex.: 30'});
+      cs.appendChild(campo('Porcentagem do procedimento (%)', d2, null, 'O site mostra para ela só isto, por exemplo "30% do procedimento". Ela não paga aluguel.'));
       var ob = el('textarea'); ob.id = 'pa-obs'; ob.rows = 2; ob.placeholder = 'Ex.: Fisioterapeuta, paga até o dia 5'; ob.value = p ? p.observacao : '';
       cs.appendChild(campo('Observação (só a equipe vê)', ob, 'largo'));
       f.appendChild(cs);
@@ -711,11 +713,11 @@
       var salvar = el('button', 'btn', p ? 'Salvar' : 'Cadastrar parceiro'); salvar.type = 'submit'; rod.appendChild(salvar); f.appendChild(rod);
       f.addEventListener('submit', function(e){
         e.preventDefault(); msg.textContent = '';
-        var dados = { nome: $('pa-nome').value.trim(), email: $('pa-email').value.trim(), descontoAluguel: numero(d1.value), pctAtendimento: numero(d2.value), observacao: ob.value.trim() };
+        var dados = { nome: $('pa-nome').value.trim(), email: $('pa-email').value.trim(), pctAtendimento: numero(d2.value), observacao: ob.value.trim() };
         if(dados.nome.length < 2){ msg.textContent = 'Digite o nome.'; return; }
         if(!/\S+@\S+\.\S+/.test(dados.email)){ msg.textContent = 'Digite o e-mail da conta da pessoa.'; return; }
-        if(dados.descontoAluguel === null) dados.descontoAluguel = 0; if(dados.pctAtendimento === null) dados.pctAtendimento = 0;
-        if(isNaN(dados.descontoAluguel) || dados.descontoAluguel < 0 || dados.descontoAluguel > 100 || isNaN(dados.pctAtendimento) || dados.pctAtendimento < 0 || dados.pctAtendimento > 100){ msg.textContent = 'As porcentagens vão de 0 a 100.'; return; }
+        if(dados.pctAtendimento === null){ msg.textContent = 'Digite a porcentagem do procedimento.'; return; }
+        if(isNaN(dados.pctAtendimento) || dados.pctAtendimento <= 0 || dados.pctAtendimento > 100){ msg.textContent = 'A porcentagem vai de 1 a 100.'; return; }
         salvar.disabled = true;
         escrever('form-parceiro', function(){ return p ? api('PATCH', '/api/admin/parceiros/' + p.id, dados) : api('POST', '/api/admin/parceiros', dados); }).then(function(ok){
           salvar.disabled = false; if(ok){ fechar(); toast(p ? 'Parceiro atualizado.' : dados.nome + ' agora é parceiro da Casa.'); }
