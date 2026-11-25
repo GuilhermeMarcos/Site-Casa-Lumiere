@@ -243,7 +243,7 @@
       var chip = el('span', 'chip ' + ({confirmada:'ok', pre:'pre', expirada:'exp'})[r.status], ({confirmada:'Reservada', pre:'Pré-reserva', expirada:'Pré-reserva expirou'})[r.status]); meio.appendChild(chip);
       if(r.status === 'pre' && r.expiraEm){ meio.appendChild(el('span', 'expira', 'Vale até ' + fmtHora.format(new Date(r.expiraEm)))); }
       if(r.origem === 'painel') meio.appendChild(el('span', 'origem', 'Feita pelo painel'));
-      var vl = el('span', 'valor-res', r.valor != null ? brl(r.valor) : r.parceiroId ? pctTxt(r.pctParceiro != null ? r.pctParceiro : 0) + ' do procedimento' : 'Valor a combinar');
+      var vl = el('span', 'valor-res', r.valor != null ? brl(r.valor) : r.parceiroId ? pctTxt(r.pctParceiro != null ? r.pctParceiro : 0) + ' dos atendimentos' : 'Valor a combinar');
       if(r.parceiroId){ var pc = parceiroPorId(r.parceiroId); vl.appendChild(el('small', null, ' parceiro' + (pc ? ' ' + pc.nome.split(' ')[0] : ''))); }
       meio.appendChild(vl);
       li.appendChild(meio);
@@ -328,7 +328,7 @@
       cs.appendChild(campo('Especialidade', entrada('r-esp', 'text', r ? r.especialidade : '')));
       cs.appendChild(campo('WhatsApp', entrada('r-tel', 'tel', r && r.telefone ? formatarTel(r.telefone) : '', {inputmode:'tel', placeholder:'(19) 99999-9999'})));
       cs.appendChild(campo('Situação', seletor('r-status', [['confirmada', 'Reservada'], ['pre', 'Pré-reserva']], r ? (r.status === 'confirmada' ? 'confirmada' : 'pre') : 'confirmada')));
-      var opsParc = [['', 'Não é parceiro']].concat(st.parceiros.filter(function(p){ return p.ativo || (r && r.parceiroId === p.id); }).map(function(p){ return [p.id, p.nome + ' (' + pctTxt(p.pctAtendimento) + ' do procedimento)']; }));
+      var opsParc = [['', 'Não é parceiro']].concat(st.parceiros.filter(function(p){ return p.ativo || (r && r.parceiroId === p.id); }).map(function(p){ return [p.id, p.nome + ' (' + pctTxt(p.pctAtendimento) + ' dos atendimentos)']; }));
       cs.appendChild(campo('Parceiro', seletor('r-parc', opsParc, r ? (r.parceiroId || '') : '')));
       var iVal = entrada('r-valor', 'text', '', {inputmode:'decimal', placeholder:'0,00'});
       var pv = el('div', 'prefixo'); pv.appendChild(el('span', null, 'R$')); pv.appendChild(iVal);
@@ -341,7 +341,7 @@
       }
       function mostrarAuto(){
         var pc = parceiroPorId($('r-parc').value), v = valorAuto();
-        if(pc){ ajudaVal.textContent = 'Parceiro não paga aluguel: repassa ' + pctTxt(pc.pctAtendimento) + ' do procedimento. Deixe em branco.'; return; }
+        if(pc){ ajudaVal.textContent = 'Parceiro não paga aluguel: repassa ' + pctTxt(pc.pctAtendimento) + ' dos atendimentos. Deixe em branco.'; return; }
         ajudaVal.textContent = 'Em branco: ' + (v != null ? brl(v) + ' pela tabela da sala' : 'a tabela da sala não tem preço para essas horas') + '.';
       }
       if(r && r.valor != null && r.valor !== valorAuto()) iVal.value = emReais(r.valor);
@@ -580,7 +580,7 @@
     return { el: caixa, ler: ler };
   }
 
-  /* ===== Parceiros: não pagam aluguel, repassam uma porcentagem do procedimento ===== */
+  /* ===== Parceiros: não pagam aluguel, repassam uma porcentagem dos atendimentos ===== */
   function parceiroPorId(id){ return st.parceiros.filter(function(p){ return p.id === id; })[0]; }
   function pctTxt(v){ return String(v).replace('.', ',') + '%'; }
   function aReceber(){ return st.atendimentos.filter(function(a){ return a.status === 'pendente'; }).reduce(function(t, a){ return t + a.repasse; }, 0); }
@@ -604,10 +604,10 @@
     });
     s.appendChild(nums);
 
-    var b = bloco('Parceiros', 'Não pagam aluguel: repassam uma porcentagem de cada procedimento feito na sala');
+    var b = bloco('Parceiros', 'Não pagam aluguel: repassam uma porcentagem dos atendimentos feitos na sala');
     var novo = el('button', 'btn', 'Novo parceiro'); novo.type = 'button'; novo.addEventListener('click', function(){ formParceiro(null); });
     b.querySelector('.bloco-cab').appendChild(novo);
-    if(!st.parceiros.length) b.appendChild(vazio('Nenhum parceiro ainda', 'Cadastre o nome, o e-mail da conta da pessoa no site e a porcentagem do procedimento. A condição vale quando ela reservar com a conta desse e-mail.'));
+    if(!st.parceiros.length) b.appendChild(vazio('Nenhum parceiro ainda', 'Cadastre o nome, o e-mail da conta da pessoa no site e a porcentagem dos atendimentos. A condição vale quando ela reservar com a conta desse e-mail.'));
     var ul = el('ul', 'lista');
     st.parceiros.forEach(function(p){
       var li = el('li', 'parc' + (p.ativo ? '' : ' off'));
@@ -615,7 +615,7 @@
       meio.appendChild(el('div', 'sala-nome', p.nome));
       meio.appendChild(el('div', 'pessoa', p.email));
       var regras = el('div', 'regras');
-      regras.appendChild(el('span', null, pctTxt(p.pctAtendimento) + ' do procedimento para a Casa'));
+      regras.appendChild(el('span', null, pctTxt(p.pctAtendimento) + ' dos atendimentos para a Casa'));
       regras.appendChild(el('span', null, 'Sem aluguel'));
       meio.appendChild(regras);
       var cc = CONTA[p.conta] || CONTA.sem_conta; meio.appendChild(el('span', 'chip ' + cc[0], p.ativo ? cc[1] : 'Parceria desativada'));
@@ -704,7 +704,7 @@
       cs.appendChild(campo('Nome', entrada('pa-nome', 'text', p ? p.nome : '', {autocomplete:'off'})));
       cs.appendChild(campo('E-mail da conta no site', entrada('pa-email', 'email', p ? p.email : '', {autocomplete:'off', inputmode:'email'}), null, 'A condição de parceiro vale quando ela reservar com a conta deste e-mail.'));
       var d2 = entrada('pa-pct', 'text', p ? emReais(p.pctAtendimento) : '', {inputmode:'decimal', placeholder:'Ex.: 30'});
-      cs.appendChild(campo('Porcentagem do procedimento (%)', d2, null, 'O site mostra para ela só isto, por exemplo "30% do procedimento". Ela não paga aluguel.'));
+      cs.appendChild(campo('Porcentagem dos atendimentos (%)', d2, null, 'O site mostra para ela só isto, por exemplo "30% dos atendimentos". Ela não paga aluguel.'));
       var ob = el('textarea'); ob.id = 'pa-obs'; ob.rows = 2; ob.placeholder = 'Ex.: Fisioterapeuta, paga até o dia 5'; ob.value = p ? p.observacao : '';
       cs.appendChild(campo('Observação (só a equipe vê)', ob, 'largo'));
       f.appendChild(cs);
@@ -716,7 +716,7 @@
         var dados = { nome: $('pa-nome').value.trim(), email: $('pa-email').value.trim(), pctAtendimento: numero(d2.value), observacao: ob.value.trim() };
         if(dados.nome.length < 2){ msg.textContent = 'Digite o nome.'; return; }
         if(!/\S+@\S+\.\S+/.test(dados.email)){ msg.textContent = 'Digite o e-mail da conta da pessoa.'; return; }
-        if(dados.pctAtendimento === null){ msg.textContent = 'Digite a porcentagem do procedimento.'; return; }
+        if(dados.pctAtendimento === null){ msg.textContent = 'Digite a porcentagem dos atendimentos.'; return; }
         if(isNaN(dados.pctAtendimento) || dados.pctAtendimento <= 0 || dados.pctAtendimento > 100){ msg.textContent = 'A porcentagem vai de 1 a 100.'; return; }
         salvar.disabled = true;
         escrever('form-parceiro', function(){ return p ? api('PATCH', '/api/admin/parceiros/' + p.id, dados) : api('POST', '/api/admin/parceiros', dados); }).then(function(ok){

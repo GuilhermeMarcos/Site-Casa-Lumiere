@@ -54,8 +54,8 @@
     return { valor: st.parceria ? null : cheio, cheio: cheio };
   }
   function pctTxt(v){ return String(v).replace('.', ',') + '%'; }
-  /* Parceiro não paga aluguel: só a porcentagem do procedimento. Para ele, o site não mostra valor em R$. */
-  function procTxt(pct){ return pctTxt(pct) + ' do procedimento'; }
+  /* Parceiro não paga aluguel: só a porcentagem dos atendimentos. Para ele, o site não mostra valor em R$. */
+  function procTxt(pct){ return pctTxt(pct) + ' dos atendimentos'; }
   function valorReserva(r){
     if(r.parceiroId && r.valor == null) return procTxt(r.pctParceiro != null ? r.pctParceiro : (st.parceria ? st.parceria.pctAtendimento : 0));
     return r.valor != null ? brl(r.valor) : 'A combinar';
@@ -175,7 +175,7 @@
       var tp = d.createElement('div'); tp.className = 'precos-sala parceiro';
       var tt = d.createElement('span'); tt.className = 'precos-tit'; tt.textContent = 'Parceiro'; tp.appendChild(tt);
       var tl = d.createElement('span'); tl.className = 'precos-linha'; var tb = d.createElement('b'); tb.textContent = pctTxt(st.parceria.pctAtendimento);
-      tl.appendChild(tb); tl.appendChild(d.createTextNode(' do procedimento')); tp.appendChild(tl);
+      tl.appendChild(tb); tl.appendChild(d.createTextNode(' dos atendimentos')); tp.appendChild(tl);
       f.appendChild(tp);
     } else if(s.precos && s.precos.length){
       var tag = d.createElement('div'); tag.className = 'precos-sala';
@@ -434,10 +434,10 @@
       'Sala: ' + nomeSalaId(salaId),
       'Dia: ' + diaLongo(data),
       'Horário: ' + faixa(horas) + ' (' + horas.length + (horas.length === 1 ? ' hora)' : ' horas)'),
-      'Valor: ' + (valorTexto === 'A combinar' ? 'a combinar' : valorTexto) + (/procedimento/.test(valorTexto) ? ' (parceiro)' : ''),
+      'Valor: ' + (valorTexto === 'A combinar' ? 'a combinar' : valorTexto) + (/atendimentos/.test(valorTexto) ? ' (parceiro)' : ''),
       'Nome: ' + nome];
     if(esp) linhas.push('Especialidade: ' + esp);
-    linhas.push('WhatsApp: ' + telVisivel(tel), '', /procedimento/.test(valorTexto) ? 'Pode confirmar a reserva?' : 'Pode confirmar a reserva e me dizer como faço o pagamento?');
+    linhas.push('WhatsApp: ' + telVisivel(tel), '', /atendimentos/.test(valorTexto) ? 'Pode confirmar a reserva?' : 'Pode confirmar a reserva e me dizer como faço o pagamento?');
     /* Link de 1 clique para a Agatha confirmar. Só funciona com a conta da equipe; para o cliente não faz nada. */
     if(reservaId) linhas.push('', 'Para a equipe confirmar: ' + location.origin + '/confirmar.html?r=' + encodeURIComponent(reservaId));
     return linhas.join('\n');
