@@ -48,7 +48,7 @@ async function parceriaDe(u) {
 }
 
 // Valor da reserva calculado no servidor (o navegador só mostra; nunca decide o preço).
-// Parceiro não paga aluguel: paga a porcentagem do procedimento (lançada depois em Atendimentos). A reserva fica sem valor.
+// Parceiro não paga aluguel: paga a porcentagem dos atendimentos (lançada depois em Atendimentos). A reserva fica sem valor.
 function precoDaReserva(sala, nHoras, parceria) {
   const cheio = calcularValor(sala.precos, nHoras);
   return { valor: parceria ? null : cheio, valorCheio: cheio, descontoPct: null, parceiroId: parceria ? parceria.id : null };

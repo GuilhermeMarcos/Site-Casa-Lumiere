@@ -89,10 +89,10 @@ test('a equipe cadastra a parceira; com o e-mail sem verificação, o desconto s
   assert.equal(r.status, 200);
   d = await equipe('GET', '/api/admin/dados');
   assert.equal(d.dados.parceiros.find((p) => p.id === idParceira).conta, 'conferida');
-  assert.deepEqual((await parceira('GET', '/api/agenda')).dados.parceria, { pctAtendimento: 20 }, 'o site recebe só a porcentagem do procedimento');
+  assert.deepEqual((await parceira('GET', '/api/agenda')).dados.parceria, { pctAtendimento: 20 }, 'o site recebe só a porcentagem dos atendimentos');
 });
 
-test('a parceira não paga aluguel: a reserva sai sem valor, com a porcentagem do procedimento', async () => {
+test('a parceira não paga aluguel: a reserva sai sem valor, com a porcentagem dos atendimentos', async () => {
   const r = await parceira('POST', '/api/reservas', { sala: 'sala-02', data: dia, horas: [14, 15, 16, 17] });
   assert.equal(r.status, 201);
   assert.equal(r.dados.reserva.valorCheio, 180, 'o preço normal fica guardado só para referência');
