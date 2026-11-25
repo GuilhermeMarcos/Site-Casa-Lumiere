@@ -64,7 +64,7 @@ No teste local, a conta da equipe usa o e-mail `equipe@casalumiere.com.br` e o c
 | `fixos` | Horários fixos: toda semana, a cada 15 dias ou uma vez |
 | `reservas` | Pré-reservas e reservas, com quem, quando, a situação e o valor calculado |
 | `profissionais` | Quem aparece na página Profissionais: nome, especialidade, registro, WhatsApp, foto, ordem e se aparece no site |
-| `parceiros` | Quem tem desconto no aluguel e repassa uma porcentagem dos atendimentos |
+| `parceiros` | Quem não paga aluguel e repassa uma porcentagem do procedimento (o site mostra só "X% do procedimento") |
 | `atendimentos` | Atendimentos lançados pela equipe, com o repasse e se já foi recebido |
 | `reserva_horas` | Uma linha por hora ocupada. A chave sala + dia + hora impede reserva dupla |
 | `config` | Funcionamento: horário, dias abertos, antecedência, WhatsApp da Agatha |

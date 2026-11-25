@@ -89,10 +89,10 @@ test('editar o parceiro (mesmo e-mail) não apaga o "É ela mesma"', async () =>
   assert.equal(c.status, 201);
   assert.equal((await paula('GET', '/api/agenda')).dados.parceria, null, 'conta sem verificação: ainda sem desconto');
   assert.equal((await equipe('PATCH', `/api/admin/parceiros/${c.dados.id}`, { conferirConta: true })).status, 200);
-  assert.equal((await paula('GET', '/api/agenda')).dados.parceria.descontoAluguel, 30);
+  assert.equal((await paula('GET', '/api/agenda')).dados.parceria.pctAtendimento, 20);
   // o formulário do painel manda todos os campos, inclusive o mesmo e-mail
-  assert.equal((await equipe('PATCH', `/api/admin/parceiros/${c.dados.id}`, { nome: 'Paula Parceira', email: 'paula@exemplo.com', descontoAluguel: 40, pctAtendimento: 20, observacao: '' })).status, 200);
-  assert.equal((await paula('GET', '/api/agenda')).dados.parceria.descontoAluguel, 40, 'desconto continua valendo e já com o valor novo');
+  assert.equal((await equipe('PATCH', `/api/admin/parceiros/${c.dados.id}`, { nome: 'Paula Parceira', email: 'paula@exemplo.com', pctAtendimento: 25, observacao: '' })).status, 200);
+  assert.equal((await paula('GET', '/api/agenda')).dados.parceria.pctAtendimento, 25, 'parceria continua valendo e já com a porcentagem nova');
   // trocou o e-mail: a conferência antiga deixa de valer
   assert.equal((await equipe('PATCH', `/api/admin/parceiros/${c.dados.id}`, { email: 'outra@exemplo.com' })).status, 200);
   assert.equal((await equipe('PATCH', `/api/admin/parceiros/${c.dados.id}`, { email: 'paula@exemplo.com' })).status, 200);

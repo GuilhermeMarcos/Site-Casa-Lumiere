@@ -80,7 +80,7 @@
     c.appendChild(el('span', 'selo ' + selo[0], selo[1]));
     var dl = el('dl');
     [['Pessoa', r.nome + (r.especialidade ? ', ' + r.especialidade : '')], ['Sala', sala], ['Dia', dia(r.data)], ['Horário', faixa(r.horas)],
-     ['Valor', r.valor != null ? brl.format(r.valor) + (r.descontoPct ? ' (parceiro)' : '') : 'A combinar']].forEach(function(l, i){
+     ['Valor', r.valor != null ? brl.format(r.valor) : r.parceiroId ? String(r.pctParceiro != null ? r.pctParceiro : 0).replace('.', ',') + '% do procedimento (parceiro)' : 'A combinar']].forEach(function(l, i){
       dl.appendChild(el('dt', null, l[0])); dl.appendChild(el('dd', i === 4 ? 'valor' : null, l[1]));
     });
     c.appendChild(dl); tela.appendChild(c);
